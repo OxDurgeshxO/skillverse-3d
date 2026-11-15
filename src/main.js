@@ -103,6 +103,10 @@ class SkillverseApp {
     this.container = document.getElementById('webgl-container');
     this.clock = new PerformanceTimer();
     this.cameraMode = 'cinematic'; // 'cinematic' | 'orbit' | 'explorer'
+    this._fpsSamples = [];
+    this._slowFrameCount = 0;
+    this._tempDir = new THREE.Vector3();
+    this._toSunVec = new THREE.Vector3();
 
     this.coordinator = new SkillverseCoordinator(this);
     this.activeRobots = [];
@@ -1633,6 +1637,23 @@ class SkillverseApp {
     const delta = this.clock.getDelta();
     const time = this.clock.getElapsedTime();
 
+    // Rolling 30-frame average FPS counter & pause sampling on document.hidden
+    const isTabHidden = typeof document !== 'undefined' && document.hidden;
+    if (!isTabHidden && delta > 0.0001 && delta < 0.25) {
+      this._fpsSamples.push(delta);
+      if (this._fpsSamples.length > 30) this._fpsSamples.shift();
+    }
+
+    // Adaptive DPR throttling under sustained load (>18ms frame time over 120 frames)
+    if (delta > 0.018) {
+      this._slowFrameCount++;
+      if (this._slowFrameCount > 120 && this.renderer && this.renderer.getPixelRatio() > 1.0) {
+        this.renderer.setPixelRatio(1.0);
+      }
+    } else if (this._slowFrameCount > 0) {
+      this._slowFrameCount--;
+    }
+
     // Modulate lens condensation and rain droplet refraction during stratosphere cloud descent
     if (this.postProcessing) {
       const isCloudDescent = (this.camera.position.y > 220 && (this.cameraMode === 'cinematic' ? this.sequencer.currentTime < 4.5 : true));
@@ -1641,10 +1662,9 @@ class SkillverseApp {
 
       // Fix 9: Directional Sun Glare Raycast Occlusion Check
       if (this.worldManager?.sunLight) {
-        const toSun = new THREE.Vector3().subVectors(this.worldManager.sunLight.position, this.camera.position).normalize();
-        const camDir = new THREE.Vector3();
-        this.camera.getWorldDirection(camDir);
-        const dot = camDir.dot(toSun);
+        this._toSunVec.subVectors(this.worldManager.sunLight.position, this.camera.position).normalize();
+        this.camera.getWorldDirection(this._tempDir);
+        const dot = this._tempDir.dot(this._toSunVec);
         const inCity = Math.hypot(this.camera.position.x, this.camera.position.z) < 140;
         const occluded = (dot > 0.6 && inCity && this.camera.position.y < 45) ? 0.75 : 0.0;
         this.postProcessing.setSunGlareOcclusion(occluded);
@@ -1717,7 +1737,7 @@ class SkillverseApp {
     // 4a. Update Verlet Dynamic Cloth Banners & Sky Traffic Corridors & Wildlife
     if (this.clothSimulation) {
       const windVec = this.weatherEngine?.getWindVector() || { x: 3.5, y: 0.2, z: 2.0 };
-      this.clothSimulation.update(delta, windVec);
+      this.clothSimulation.update(delta, windVec, this.camera.position);
     }
     if (this.skyTraffic) this.skyTraffic.update(delta, time);
     if (this.biomeWildlife) this.biomeWildlife.update(delta, time);
@@ -1725,9 +1745,8 @@ class SkillverseApp {
 
     // 4b. Update Holographic 3D Globe GPS Radar HUD (with Weather Isobars & Compass dial)
     if (this.radar) {
-      const dir = new THREE.Vector3();
-      this.camera.getWorldDirection(dir);
-      const yaw = Math.atan2(dir.x, dir.z);
+      this.camera.getWorldDirection(this._tempDir);
+      const yaw = Math.atan2(this._tempDir.x, this._tempDir.z);
       const weatherData = this.weatherEngine ? {
         state: this.weatherEngine.currentState,
         windVec: this.weatherEngine.getWindVector(),
@@ -1754,14 +1773,17 @@ class SkillverseApp {
     this._telemetryTimer = (this._telemetryTimer || 0) + delta;
     if (this._telemetryTimer >= 0.25) {
       this._telemetryTimer = 0;
-      const fps = Math.round(1 / Math.max(delta, 0.001));
+      let fps = 60;
+      if (this._fpsSamples.length > 0) {
+        const avgDelta = this._fpsSamples.reduce((a, b) => a + b, 0) / this._fpsSamples.length;
+        fps = Math.min(60, Math.round(1 / Math.max(avgDelta, 0.001)));
+      }
       const fpsElem = document.getElementById('hud-fps');
       if (fpsElem) fpsElem.textContent = `${fps} FPS`;
 
       // Small 2: Compass Heading Dial & Altimeter
-      const dir = new THREE.Vector3();
-      this.camera.getWorldDirection(dir);
-      const deg = Math.round(((Math.atan2(dir.x, dir.z) * 180 / Math.PI) + 360) % 360);
+      this.camera.getWorldDirection(this._tempDir);
+      const deg = Math.round(((Math.atan2(this._tempDir.x, this._tempDir.z) * 180 / Math.PI) + 360) % 360);
       const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
       const card = cardinals[Math.round(deg / 45) % 8];
       const headingElem = document.getElementById('hud-heading');

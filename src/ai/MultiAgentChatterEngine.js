@@ -13,6 +13,7 @@ export class MultiAgentChatterEngine {
 
     this.activeConversations = new Map();
     this.chatterCooldown = 0;
+    this._proximityTimer = 0.5;
     this.activeSpeechBubbles = [];
     this.bubblePool = [];
     this.initBubblePool();
@@ -173,6 +174,11 @@ export class MultiAgentChatterEngine {
   update(delta, time, activeRobots = []) {
     this.updatePool(delta);
     this.chatterCooldown -= delta;
+
+    // Throttle pairwise proximity evaluation to 2 Hz (every 500ms) saving 96% CPU distance calculations
+    this._proximityTimer = (this._proximityTimer || 0) + delta;
+    if (this._proximityTimer < 0.5) return;
+    this._proximityTimer = 0;
 
     // Check proximity between robot pairs (d < 2.5m)
     if (this.chatterCooldown <= 0 && activeRobots.length >= 2) {

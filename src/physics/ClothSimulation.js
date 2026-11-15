@@ -28,6 +28,8 @@ export class ClothSimulation {
     this.initParticles();
     this.initConstraints();
     this.initGeometry();
+    this._deltaVec = new THREE.Vector3();
+    this._frameSkip = 0;
   }
 
   initParticles() {
@@ -130,7 +132,17 @@ export class ClothSimulation {
     this.mesh.receiveShadow = true;
   }
 
-  update(delta = 0.016, windVector = { x: 4.0, y: 0.5, z: 2.5 }) {
+  update(delta = 0.016, windVector = { x: 4.0, y: 0.5, z: 2.5 }, cameraPos = null) {
+    // Stage 3 CPU Optimization: Distance-throttled simulation
+    if (cameraPos && this.mesh) {
+      const distToCam = Math.hypot(cameraPos.x - this.mesh.position.x, cameraPos.z - this.mesh.position.z);
+      if (distToCam > 120) return; // Completely cull calculation outside 120m
+      if (distToCam > 40) {
+        this._frameSkip = (this._frameSkip || 0) + 1;
+        if (this._frameSkip % 2 !== 0) return; // 30 Hz update between 40m - 120m
+      }
+    }
+
     const dt = Math.min(delta, 0.033);
     const dtSq = dt * dt;
 
@@ -159,8 +171,8 @@ export class ClothSimulation {
       p.prevPos.set(tempX, tempY, tempZ);
     });
 
-    // 2. Relax distance constraints (3 relaxation solver passes)
-    const deltaVec = new THREE.Vector3();
+    // 2. Relax distance constraints (3 relaxation solver passes with pre-allocated vector)
+    const deltaVec = this._deltaVec || new THREE.Vector3();
     for (let iter = 0; iter < 3; iter++) {
       this.constraints.forEach((c) => {
         const p1 = this.particles[c.p1];
