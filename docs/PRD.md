@@ -34,4 +34,16 @@
 - **18-Skill Roster & Inspector Card**: Slide-out drawer with 3D print STL mesh exporter (28 mm tabletop scale).
 - **Conversational Dialogue Terminal**: Two-way interactive chat with robotic speech synthesis and live 3D holographic code widget compilation.
 - **Holographic Night Festival Toggle**: Smooth day/night lighting transition with 8 vertical 320m volumetric laser searchlights.
+- **Continuous 24h Astronomical Day/Night Cycle**: Slider calculating mathematical sun azimuth, elevation, and atmospheric color temperature (dawn rose -> midday white -> golden hour -> midnight blue).
+- **Director Studio & Capture**:
+  - 4K photo snapshot export (`.png`).
+  - 60 FPS video recording exporter (`MediaRecorder` streaming `.webm`/`.mp4`).
+  - 3D Holographic Globe GPS Radar HUD with real-time explorer blip and zone beacons.
+  - Picture-in-Picture (PiP) secondary multi-cam HUD (Scout Drone FPV, Maglev front cab, Launch tower).
+- **3D Robot Builder Customizer**:
+  - 360° turntable customizer modal allowing players to configure PBR armor, LED sensors, and tool rigs, then deploy live into the world or export to 28mm tabletop STL.
+- **Autonomous Pedestrian Crowd**:
+  - 32 miniature citizens traversing Tech City boulevard with crosswalk signal obedience.
+- **Post-Processing & Shaders**:
+  - Unreal Bloom, macro tilt-shift bokeh depth of field, and subsurface scattering (SSS) PBR shaders.
 - **WebXR VR**: 6DoF immersive VR support for Oculus Quest / Apple Vision Pro.

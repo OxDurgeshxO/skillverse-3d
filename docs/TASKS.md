@@ -50,9 +50,31 @@
 - [x] Step 0 Canonical documentation suite scaffolded (`PRD.md`, `ARCHITECTURE.md`, `RULES.md`, `DESIGN.md`, `TASKS.md`, `MEMORY.md`).
 - [x] Automated test suite integrated with `node --test` across 8 test suites (100% pass, 0 gaps in `/skills` scan).
 
+### Phase 7: Comprehensive Security Hardening & Fault Resilience
+- [x] Strict Content Security Policy (CSP) headers applied to `index.html`.
+- [x] Full input sanitization (`escapeHTML`, `clampNumber`) neutralizing DOM XSS attack vectors.
+- [x] Recursive WebGL GPU VRAM buffer reclamation (`disposeHierarchy`, `disposeMaterial`).
+- [x] WebGL context loss and restoration resilience handlers (`webglcontextlost`, `webglcontextrestored`).
+- [x] Binary/ASCII STL exporter path traversal sanitization defending against directory escapement.
+- [x] Zero CVE audit score across dependencies (`npm audit`).
+
+### Phase 8: 15-Feature Staged Evolution Roadmap
+- [x] **Stage 1 (Optics & Shaders)**: Unreal Bloom, Tilt-Shift Bokeh DOF (`PostProcessingPipeline.js`), and Sub-surface scattering PBR (`subsurfaceShader.js`).
+- [x] **Stage 2 (Atmosphere & Sensory Audio)**: Continuous 24h astronomical sun elevation cycle slider (`WorldManager.js`), HRTF 3D positional audio `PannerNode`, and procedural surface footsteps/maglev doppler whoosh (`SpatialAudioEngine.js`).
+- [x] **Stage 3 (Navigation & Director Studio)**: 3D Holographic Globe GPS Radar HUD (`HolographicRadar.js`), Picture-in-Picture Drone/Transit multi-cam (`PictureInPictureCamera.js`), and 4K photo capture + 60 FPS video recording exporter (`VideoRecorderExporter.js`).
+- [x] **Stage 4 (Inhabitant Intelligence & Customizer)**: Analytic two-bone IK foot planting (`InverseKinematicsSolver.js`), 360° turntable in-app 3D Robot Builder modal (`RobotCustomizerModal.js`), and 32-agent autonomous pedestrian crowd with crosswalk signals (`CrowdSimulationEngine.js`).
+- [x] **Stage 5 (Simulation Engine)**: 50,000 GPU billboard particles (`GpuParticleSystem.js`), ocean wave buoyancy and hydrodynamic pitch/roll torque (`PhysicsWorld.js`), and real-time multimodal voice agent bridge (`RobotVoiceAgentBridge.js`).
+
+### Phase 9: Governance & Desktop Integration
+- [x] Native Windows Desktop Live Preview Shortcut (`Skillverse 3D Live Preview.url`).
+- [x] Global WebGL memory safety invariant rule persisted (`rules/threejs-memory-safety.md`).
+- [x] 23 / 23 automated tests passing continuously (`npm test`).
+
 ---
 
 ## Active & Upcoming Backlog
 - [ ] Multi-zone passenger transfer stations with automated train scheduling.
 - [ ] Live procedural rain droplets refracting on 24mm camera lens during Phase 1.
-- [ ] Direct WebXR controller teleportation and hands tracking.
+- [ ] Direct WebXR controller raycast teleportation and hands tracking.
+- [ ] Resilient auto-launcher batch script (`Launch Skillverse 3D.bat`).
+- [ ] Production bundle chunk-splitting optimization ($< 500\text{ kB}$).

@@ -71,3 +71,41 @@ This creates a realistic miniature Earth horizon visible during the 0–4s strat
   - Multi-octave 3D Perlin ray-marching with sunset absorption and silver-lining scattering.
 - **Hologram Shader** (`src/shaders/hologramShader.js`):
   - Additive blending, scanlines, Fresnel edge glow, and temporal flicker.
+
+## 5. Post-Processing & Optics Pipeline
+- **Post-Processing Pipeline** (`src/shaders/PostProcessingPipeline.js`):
+  - Three.js `EffectComposer` chain: `RenderPass` -> `UnrealBloomPass` (threshold: 0.82, strength: 0.55, radius: 0.35) -> `ShaderPass(TiltShiftShader)` -> `OutputPass`.
+  - Tilt-shift lens pass simulates macro miniature depth-of-field with sharp focus on explorer/robots and smooth bokeh blur on skyline towers.
+- **Sub-Surface Scattering (SSS)** (`src/shaders/subsurfaceShader.js`):
+  - Simulates subsurface light transmission for humanoid skin and translucent polycarbonate robot visors.
+
+## 6. Spatial Audio & Acoustic Telemetry
+- **Web Audio 3D Positional Engine** (`src/audio/SpatialAudioEngine.js`):
+  - HRTF 3D `AudioListener` position & orientation dynamically synchronized with Three.js camera.
+  - Inverse distance attenuation `PannerNode` attached to transit trains, waterfalls, and companion robots.
+  - Procedural FM surface footstep synthesizer modulated by terrain material (asphalt, metal, grass, water).
+  - Doppler frequency glide synthesizer for passing maglev trains.
+
+## 7. Inhabitant Intelligence & Kinematics
+- **Analytic Two-Bone IK** (`src/entities/InverseKinematicsSolver.js`):
+  - Law of Cosines trigonometric solver for robot legs maintaining ground contact across slopes and curbs without hovering or sinking.
+- **Autonomous Crowd Pathfinding** (`src/world/CrowdSimulationEngine.js`):
+  - 32 miniature citizens with reciprocal velocity avoidance (RVO) vector steering and 3-phase crosswalk traffic signal state machine (Green, Yellow, Red).
+- **3D Robot Builder Customizer** (`src/ui/RobotCustomizerModal.js`):
+  - 360° auto-turntable modal allowing players to configure PBR armor, LED sensors, and signature rigs, then deploy live into the planet.
+
+## 8. Simulation & VFX Engine
+- **High-Density GPU Particles** (`src/shaders/GpuParticleSystem.js`):
+  - 50,000 billboard particles computed entirely on GPU across 4 emitter channels (steam, welding sparks, waterfall mist, quantum dust).
+- **Rigid-Body & Ocean Buoyancy** (`src/physics/PhysicsWorld.js`):
+  - Archimedes buoyant force and hydrodynamic pitch/roll torque calculated from procedural ocean wave gradients.
+- **Multimodal Voice Agent Bridge** (`src/ai/RobotVoiceAgentBridge.js`):
+  - Web Speech API speech-to-text bridge connecting to robot knowledge reasoning and multi-formant robotic formant speech synthesis.
+
+## 9. Director Studio & Navigation HUD
+- **3D Holographic GPS Radar** (`src/ui/HolographicRadar.js`):
+  - Orthographic spherical projection rendering live explorer position, companion robot blips, and zone anchors.
+- **Picture-in-Picture Multi-Cam** (`src/cinematics/PictureInPictureCamera.js`):
+  - Off-screen `WebGLRenderTarget` rendering selectable secondary feeds (Scout Drone FPV, Maglev front cab, Launch tower).
+- **4K Photo Studio & Video Exporter** (`src/exporters/VideoRecorderExporter.js`):
+  - Canvas `.captureStream(60)` pipeline to `MediaRecorder` exporting high-bitrate `.webm`/`.mp4` clips and 4K PNG snapshots.
