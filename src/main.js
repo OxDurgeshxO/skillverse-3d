@@ -1650,7 +1650,9 @@ class SkillverseApp {
 
     // Rolling 30-frame average FPS counter & pause sampling on document.hidden
     const isTabHidden = typeof document !== 'undefined' && document.hidden;
-    if (!isTabHidden && delta > 0.0001 && delta < 0.25) {
+    if (isTabHidden) return; // Zero-idle GPU savings: skip physics, world updates & draw calls when backgrounded
+
+    if (delta > 0.0001 && delta < 0.25) {
       this._fpsSamples.push(delta);
       if (this._fpsSamples.length > 30) this._fpsSamples.shift();
     }
