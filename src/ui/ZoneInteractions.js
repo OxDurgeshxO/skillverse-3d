@@ -67,4 +67,71 @@ export class ZoneInteractions {
     this.activeSprayColor = hex;
     return this.activeSprayColor;
   }
+
+  sprayGraffiti(x = -120, y = 2.5, z = 120) {
+    const artDistrict = this.app?.worldManager?.zones?.artDistrict;
+    if (artDistrict && typeof artDistrict.addGraffitiDecal === 'function') {
+      const decal = artDistrict.addGraffitiDecal(x + 120, y - 5, z - 120, this.activeSprayColor);
+      if (this.app?.showToast) {
+        this.app.showToast(`🎨 ART DISTRICT: Neon graffiti applied in ${this.activeSprayColor.toUpperCase()}!`);
+      }
+      return decal;
+    }
+    return null;
+  }
+
+  // 4. Space Launch Base: Countdown & Orbital Rocket Launch Sequence (Major 3)
+  triggerRocketLaunch() {
+    const spaceBase = this.app?.worldManager?.zones?.spaceBase;
+    if (spaceBase && typeof spaceBase.launch === 'function') {
+      spaceBase.launch();
+      if (this.app?.showToast) {
+        this.app.showToast('🚀 SPACE LAUNCH BASE: Cryogenic venting active! Ignition confirmed, liftoff into stratosphere!');
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // 5. Autonomous Maglev Transit Interior Cab Ride (Medium 1)
+  toggleTransitCabRide(camera = null) {
+    const transit = this.app?.worldManager?.transit;
+    if (!transit) return false;
+    const targetCam = camera || this.app?.camera;
+    if (transit.isPlayerRiding) {
+      transit.exitTrain();
+      if (this.app?.showToast) this.app.showToast('🚊 MAGLEV TRANSIT: Exited cab view.');
+      return false;
+    } else {
+      transit.boardTrain(targetCam);
+      if (this.app?.showToast) this.app.showToast('🚊 MAGLEV TRANSIT: Boarded front cab! Panoramic windshield view active.');
+      return true;
+    }
+  }
+
+  // 6. Ancient Ruins Interactive Laser Restoration Grid (Medium 2)
+  solveRuinsLaserPuzzle() {
+    const ruins = this.app?.worldManager?.zones?.ruins;
+    if (ruins && typeof ruins.alignMirrors === 'function') {
+      ruins.alignMirrors();
+      if (this.app?.showToast) {
+        this.app.showToast('🏛️ ANCIENT RUINS: Laser grid aligned! Golden temple holographic restoration activated.');
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // 7. Underwater Submarine Dive Mode (Major 2)
+  toggleSubmarineDive() {
+    const ocean = this.app?.worldManager?.zones?.ocean;
+    if (ocean && typeof ocean.toggleDive === 'function') {
+      const isDiving = ocean.toggleDive();
+      if (this.app?.showToast) {
+        this.app.showToast(isDiving ? '🌊 OCEAN COAST: Submersible descending to seabed caustics layer!' : '🌊 OCEAN COAST: Submersible surfacing to research dock.');
+      }
+      return isDiving;
+    }
+    return false;
+  }
 }

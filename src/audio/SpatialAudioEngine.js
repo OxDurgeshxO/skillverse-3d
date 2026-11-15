@@ -486,17 +486,29 @@ export class SpatialAudioEngine {
     }
   }
 
+  /**
+   * Fix 7: Idle Audio Node Disconnection & AudioContext Suspension (GC Protection)
+   */
   toggle() {
     if (!this.isInitialized) {
       this.init();
       return true;
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
     this.isMuted = !this.isMuted;
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(this.isMuted ? 0.0 : 0.4, this.ctx.currentTime, 0.1);
+      if (this.isMuted) {
+        // Suspend context when muted to save audio thread processing
+        setTimeout(() => {
+          if (this.isMuted && this.ctx && this.ctx.state === 'running') {
+            this.ctx.suspend().catch(() => {});
+          }
+        }, 300);
+      } else {
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+      }
     }
     return !this.isMuted;
   }

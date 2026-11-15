@@ -8,8 +8,10 @@ export class TechCity {
     this.group = new THREE.Group();
     this.holograms = [];
     this.beacons = [];
+    this.streetlampMats = [];
     this.windowTexture = this.createWindowTexture();
     this.buildCity();
+    this.buildNightStreetlamps();
     this.scene.add(this.group);
   }
 
@@ -456,13 +458,70 @@ export class TechCity {
     this.group.add(hubGroup);
   }
 
-  update(time) {
+  buildNightStreetlamps() {
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.2 });
+    const lampMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x00f0ff,
+      emissiveIntensity: 0.8,
+      roughness: 0.2
+    });
+    this.streetlampMats.push(lampMat);
+
+    const postGeom = new THREE.CylinderGeometry(0.08, 0.12, 4.2, 8);
+    const armGeom = new THREE.BoxGeometry(0.8, 0.08, 0.08);
+    const headGeom = new THREE.BoxGeometry(0.35, 0.12, 0.22);
+
+    [-11.5, 11.5].forEach(x => {
+      for (let z = -35; z <= 85; z += 18) {
+        const lamp = new THREE.Group();
+        lamp.position.set(x, 0, z);
+
+        const post = new THREE.Mesh(postGeom, postMat);
+        post.position.y = 2.1;
+        post.castShadow = true;
+        lamp.add(post);
+
+        const arm = new THREE.Mesh(armGeom, postMat);
+        arm.position.set(x > 0 ? -0.4 : 0.4, 4.1, 0);
+        lamp.add(arm);
+
+        const head = new THREE.Mesh(headGeom, lampMat);
+        head.position.set(x > 0 ? -0.8 : 0.8, 4.05, 0);
+        lamp.add(head);
+
+        // Ground glow spot
+        const spotGeom = new THREE.CircleGeometry(1.6, 16);
+        spotGeom.rotateX(-Math.PI / 2);
+        const spotMat = new THREE.MeshBasicMaterial({
+          color: 0x0284c7,
+          transparent: true,
+          opacity: 0.18,
+          depthWrite: false
+        });
+        const spot = new THREE.Mesh(spotGeom, spotMat);
+        spot.position.set(x > 0 ? -0.8 : 0.8, 0.03, 0);
+        lamp.add(spot);
+
+        this.group.add(lamp);
+      }
+    });
+  }
+
+  update(time, nightIntensity = 0) {
     // Animate holographic materials
     this.holograms.forEach(mat => {
       if (mat.uniforms && mat.uniforms.uTime) {
         mat.uniforms.uTime.value = time;
       }
     });
+
+    // Modulate streetlamp glow with evening/night intensity (Major 4)
+    if (this.streetlampMats) {
+      this.streetlampMats.forEach(mat => {
+        mat.emissiveIntensity = 0.4 + nightIntensity * 2.6;
+      });
+    }
 
     // Blink red aviation warning beacons at 1 Hz
     const beaconAlpha = Math.sin(time * 6.28) > 0.0 ? 1.0 : 0.15;

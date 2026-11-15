@@ -136,4 +136,24 @@ export class DirectorWaypointEditor {
       this.createGizmos(scene);
     }
   }
+
+  /**
+   * Small 2: Cinematic Optical Lens Presets (18mm - 85mm)
+   */
+  setLensPreset(focalLengthMm, camera = null) {
+    const validLenses = {
+      18: { name: '18mm Super-Wide', fov: 67.4, dof: 0.1 },
+      24: { name: '24mm Cinematic Prime', fov: 53.1, dof: 0.2 },
+      35: { name: '35mm Street Documentary', fov: 37.8, dof: 0.35 },
+      50: { name: '50mm Natural Prime', fov: 27.0, dof: 0.55 },
+      85: { name: '85mm Portrait Telephoto', fov: 16.1, dof: 0.85 }
+    };
+    const lens = validLenses[focalLengthMm] || validLenses[24];
+    this.activeLens = lens;
+    if (camera) {
+      camera.fov = lens.fov;
+      camera.updateProjectionMatrix();
+    }
+    return lens;
+  }
 }

@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 
 export class TransitNetwork {
-  constructor(scene) {
+  constructor(scene, terrain = null) {
     this.scene = scene;
+    this.terrain = terrain;
     this.group = new THREE.Group();
     this.skycars = [];
     this.cars = [];
     this.trainCars = [];
+    this.isPlayerRiding = false;
+    this.rideCamera = null;
     this.buildMaglevStation();
     this.buildPlanetaryInterZoneMonorail();
     this.buildMaglevTrain();
@@ -140,7 +143,7 @@ export class TransitNetwork {
     const glowRail = new THREE.Mesh(topRailGeom, glowRailMat);
     this.monorailNetworkGroup.add(glowRail);
 
-    // Concrete & titanium structural pylons grounded into terrain
+    // Concrete & titanium structural pylons grounded into terrain (Fix 3: Pylon Terrain Raycast Snapping)
     const pylonGeom = new THREE.BoxGeometry(1.2, 1, 1.2);
     const pylonMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
@@ -152,10 +155,14 @@ export class TransitNetwork {
     for (let i = 0; i < numPylons; i++) {
       const u = i / numPylons;
       const point = railCurve.getPoint(u);
-      const height = Math.max(point.y, 1.0);
+      let groundY = 0;
+      if (this.terrain && typeof this.terrain.getElevationAt === 'function') {
+        groundY = this.terrain.getElevationAt(point.x, point.z);
+      }
+      const pylonHeight = Math.max(1.5, point.y - groundY);
       const pylon = new THREE.Mesh(pylonGeom, pylonMat);
-      pylon.scale.set(1.2, height, 1.2);
-      pylon.position.set(point.x, height / 2, point.z);
+      pylon.scale.set(1.2, pylonHeight, 1.2);
+      pylon.position.set(point.x, groundY + pylonHeight / 2, point.z);
       pylon.castShadow = true;
       pylon.receiveShadow = true;
       this.monorailNetworkGroup.add(pylon);
@@ -302,6 +309,20 @@ export class TransitNetwork {
     }
   }
 
+  /**
+   * Medium 1: Autonomous Maglev Transit Interior Cab Ride
+   * Allows player to board the front train cab with a futuristic dashboard HUD & panoramic windshield view
+   */
+  boardTrain(camera) {
+    this.isPlayerRiding = true;
+    this.rideCamera = camera;
+  }
+
+  exitTrain() {
+    this.isPlayerRiding = false;
+    this.rideCamera = null;
+  }
+
   update(delta, time, sequencerTime = -1) {
     if (this.trainGroup) {
       if (sequencerTime !== undefined && sequencerTime >= 0) {
@@ -326,6 +347,18 @@ export class TransitNetwork {
         this.trainGroup.position.x += 18 * delta;
         if (this.trainGroup.position.x > 85) {
           this.trainGroup.position.x = -85;
+        }
+      }
+
+      // If player is riding, update camera to inside lead car cab
+      if (this.isPlayerRiding && this.rideCamera) {
+        const leadCar = this.trainCars[2];
+        if (leadCar) {
+          const leadWorldPos = new THREE.Vector3();
+          leadCar.getWorldPosition(leadWorldPos);
+          // Panoramic front cab windshield view
+          this.rideCamera.position.set(leadWorldPos.x + 8.5, leadWorldPos.y + 0.8, leadWorldPos.z);
+          this.rideCamera.lookAt(leadWorldPos.x + 45.0, leadWorldPos.y + 0.5, leadWorldPos.z);
         }
       }
     }

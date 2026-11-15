@@ -73,12 +73,61 @@ export class OceanExplorationCoast {
     subGroup.position.set(30, -2, 25);
     this.group.add(subGroup);
     this.sub = subGroup;
+
+    // Major 2: Underwater Submarine Dive Mode & Caustics Shader
+    this.isDiving = false;
+    this.targetDepth = -2;
+    this.currentDepth = -2;
+
+    // Underwater Caustic Light Plane at seabed y = -18
+    const causticGeom = new THREE.PlaneGeometry(60, 60);
+    causticGeom.rotateX(-Math.PI / 2);
+    this.causticMat = new THREE.MeshBasicMaterial({
+      color: 0x06b6d4,
+      transparent: true,
+      opacity: 0.25,
+      depthWrite: false
+    });
+    this.causticPlane = new THREE.Mesh(causticGeom, this.causticMat);
+    this.causticPlane.position.set(30, -18, 25);
+    this.group.add(this.causticPlane);
+
+    // Underwater Kelp Forest (swaying stalks)
+    this.kelpStalks = [];
+    const kelpMat = new THREE.MeshStandardMaterial({ color: 0x065f46, roughness: 0.8 });
+    for (let k = 0; k < 12; k++) {
+      const angle = (k / 12) * Math.PI * 2;
+      const dist = 10 + (k % 3) * 6;
+      const kelp = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.35, 14, 6), kelpMat);
+      kelp.position.set(30 + Math.cos(angle) * dist, -11, 25 + Math.sin(angle) * dist);
+      this.group.add(kelp);
+      this.kelpStalks.push(kelp);
+    }
   }
 
-  update(time) {
+  toggleDive() {
+    this.isDiving = !this.isDiving;
+    this.targetDepth = this.isDiving ? -16.5 : -2;
+    return this.isDiving;
+  }
+
+  update(time, delta = 0.016) {
     if (this.sub) {
-      this.sub.position.y = -2 + Math.sin(time * 1.5) * 1.2;
+      this.currentDepth = THREE.MathUtils.lerp(this.currentDepth, this.targetDepth, delta * 1.5);
+      this.sub.position.y = this.currentDepth + Math.sin(time * 1.5) * 0.4;
       this.sub.rotation.y = time * 0.3;
+      this.sub.rotation.z = Math.sin(time * 1.2) * 0.05;
     }
+
+    // Dynamic underwater caustics brightness modulation
+    if (this.causticMat) {
+      this.causticMat.opacity = 0.18 + Math.sin(time * 3.5) * 0.08;
+    }
+
+    // Swaying kelp forest
+    this.kelpStalks.forEach((k, idx) => {
+      k.rotation.z = Math.sin(time * 1.8 + idx) * 0.12;
+      k.rotation.x = Math.cos(time * 1.4 + idx) * 0.12;
+    });
   }
 }

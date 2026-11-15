@@ -238,7 +238,12 @@ export class RobotCustomizerModal {
       detailPreset: 'high'
     });
 
-    this.previewRobotMesh.position.set(0, 0, 0);
+    // Fix 8: Turntable Customizer Model Dynamic Center Offset
+    // Calculates exact bounding center so all 18 species frame perfectly in 360° viewport
+    const bbox = new THREE.Box3().setFromObject(this.previewRobotMesh);
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+    this.previewRobotMesh.position.set(0, -center.y + 0.15, 0);
     this.turntableScene.add(this.previewRobotMesh);
   }
 

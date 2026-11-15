@@ -309,16 +309,28 @@ export class PostProcessingPipeline {
     } else if (tier === 'CINEMATIC') {
       if (this.tiltShiftPass) this.tiltShiftPass.enabled = true;
       if (this.bloomPass) {
+        this.bloomPass.strength = 0.65;
+        this.bloomPass.radius = 0.42;
+      }
+    } else {
+      // BALANCED
+      if (this.tiltShiftPass) this.tiltShiftPass.enabled = true;
+      if (this.bloomPass) {
         this.bloomPass.strength = 0.55;
         this.bloomPass.radius = 0.35;
       }
-    } else {
-      if (this.tiltShiftPass) this.tiltShiftPass.enabled = true;
-      if (this.bloomPass) {
-        this.bloomPass.strength = 0.45;
-        this.bloomPass.radius = 0.25;
-      }
     }
+  }
+
+  /**
+   * Fix 9: Directional Sun Glare Raycast Occlusion Check
+   * Attenuates bloom lens glare when sunlight is occluded by urban geometry
+   */
+  setSunGlareOcclusion(occludedFraction = 0.0) {
+    if (this.isMock || !this.bloomPass) return;
+    const baseStrength = this.qualityTier === 'PERFORMANCE' ? 0.35 : (this.qualityTier === 'CINEMATIC' ? 0.65 : 0.55);
+    const clamped = Math.max(0.0, Math.min(1.0, occludedFraction));
+    this.bloomPass.strength = THREE.MathUtils.lerp(baseStrength, baseStrength * 0.4, clamped);
   }
 
   togglePipeline() {

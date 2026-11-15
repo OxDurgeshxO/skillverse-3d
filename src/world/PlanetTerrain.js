@@ -28,6 +28,46 @@ export class PlanetTerrain {
     this.group.add(this.globeMesh);
   }
 
+  getElevationAt(x, z) {
+    const distFromCenter = Math.hypot(x, z);
+    const curvatureDrop = (distFromCenter * distFromCenter) / (2 * this.radius);
+    let elevation = 0;
+
+    const distMountain = Math.hypot(x - (-350), z - (-250));
+    if (distMountain < 300) {
+      elevation += Math.cos((distMountain / 300) * (Math.PI / 2)) * 120;
+      elevation += Math.sin(x * 0.05) * Math.cos(z * 0.05) * 20;
+    }
+
+    const distOcean = Math.hypot(x - 450, z - 350);
+    if (distOcean < 400) {
+      const oceanTrough = Math.cos((distOcean / 400) * (Math.PI / 2)) * 45;
+      elevation -= oceanTrough;
+    }
+
+    const distCity = Math.hypot(x, z);
+    if (distCity < 250) {
+      elevation = Math.sin(distCity * 0.01) * 2;
+    }
+
+    const distSpace = Math.hypot(x - 550, z - (-350));
+    if (distSpace < 180) {
+      elevation = 4;
+    }
+
+    return Math.max(-30, elevation - curvatureDrop);
+  }
+
+  getSurfaceNormalAt(x, z) {
+    const eps = 0.5;
+    const hL = this.getElevationAt(x - eps, z);
+    const hR = this.getElevationAt(x + eps, z);
+    const hD = this.getElevationAt(x, z - eps);
+    const hU = this.getElevationAt(x, z + eps);
+    const normal = new THREE.Vector3(hL - hR, 2 * eps, hD - hU).normalize();
+    return normal;
+  }
+
   initTerrain() {
     // High-density plane mapped to planet curvature
     const segments = 160;

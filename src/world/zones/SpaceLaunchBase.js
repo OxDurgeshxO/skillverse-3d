@@ -6,6 +6,10 @@ export class SpaceLaunchBase {
     this.group = new THREE.Group();
     this.group.position.set(420, 2, -260); // Coastal launch promontory
     this.steamParticles = [];
+    this.rocket = null;
+    this.isLaunching = false;
+    this.launchVelocity = 0;
+    this.countdownTimer = 0;
     this.buildZone();
     this.scene.add(this.group);
   }
@@ -91,7 +95,16 @@ export class SpaceLaunchBase {
       rocketGroup.add(nozzle);
     }
 
+    this.rocket = rocketGroup;
     this.group.add(rocketGroup);
+
+    // Booster Flame Plume Mesh (hidden until liftoff)
+    const flameGeom = new THREE.ConeGeometry(5.2, 28, 16);
+    flameGeom.rotateX(Math.PI);
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: 0.0 });
+    this.boosterFlame = new THREE.Mesh(flameGeom, flameMat);
+    this.boosterFlame.position.set(0, -14, 0);
+    this.rocket.add(this.boosterFlame);
 
     // Hemispherical Mission Control Telemetry Dome
     const mcGeom = new THREE.SphereGeometry(18, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -143,10 +156,43 @@ export class SpaceLaunchBase {
     }
   }
 
-  update(time) {
+  launch() {
+    this.isLaunching = true;
+    this.launchVelocity = 2.0;
+  }
+
+  resetRocket() {
+    this.isLaunching = false;
+    this.launchVelocity = 0;
+    if (this.rocket) this.rocket.position.set(0, 5, 0);
+    if (this.boosterFlame) this.boosterFlame.material.opacity = 0.0;
+  }
+
+  update(time, delta = 0.016) {
     if (this.dish) {
       this.dish.rotation.y = time * 0.2;
     }
+
+    // Rocket Ascent Physics & Booster Flame
+    if (this.isLaunching && this.rocket) {
+      this.launchVelocity += delta * 18.0;
+      this.rocket.position.y += this.launchVelocity * delta;
+
+      if (this.boosterFlame) {
+        this.boosterFlame.material.opacity = 0.85 + Math.sin(time * 30.0) * 0.15;
+        this.boosterFlame.scale.set(
+          1.0 + Math.sin(time * 40.0) * 0.15,
+          1.0 + Math.cos(time * 35.0) * 0.2,
+          1.0 + Math.sin(time * 40.0) * 0.15
+        );
+      }
+
+      // Loop after reaching mesosphere (y > 900m)
+      if (this.rocket.position.y > 900) {
+        this.resetRocket();
+      }
+    }
+
     this.steamParticles.forEach(p => {
       p.mesh.position.y += p.speedY;
       p.mesh.position.x += p.driftX;

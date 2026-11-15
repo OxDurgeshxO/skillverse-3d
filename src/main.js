@@ -23,6 +23,8 @@ import { ClothSimulation } from './physics/ClothSimulation.js';
 import { SkyTrafficEngine } from './world/SkyTrafficEngine.js';
 import { BiomeWildlifeEngine } from './world/BiomeWildlifeEngine.js';
 import { MultiplayerSyncEngine } from './network/MultiplayerSyncEngine.js';
+import { AvatarLocomotionController } from './entities/AvatarLocomotionController.js';
+import { HolographicCodeIDESandbox } from './ui/HolographicCodeIDESandbox.js';
 
 /**
  * Security & Input Validation Helpers
@@ -477,6 +479,15 @@ class SkillverseApp {
     this.controls.maxDistance = 1600;
     this.controls.minDistance = 0.4;
     this.controls.enabled = false;
+
+    // Fix 1: Touch Screen OrbitControls Pointer Conflict
+    if (this.renderer?.domElement) {
+      this.renderer.domElement.addEventListener('touchstart', (e) => {
+        if (e.target && e.target.closest && e.target.closest('#hud-overlay, #inspector-card, .modal-backdrop, #soundscape-panel, #director-studio, #customizer-modal, #code-ide-modal, .radar-hud-card, #quest-modal')) {
+          e.stopPropagation();
+        }
+      }, { passive: false });
+    }
   }
 
   initWorld() {
@@ -1142,6 +1153,29 @@ class SkillverseApp {
       });
     });
 
+    // Code IDE and Interactive Zone Activity Triggers (Stages 4 & 5)
+    document.getElementById('btn-open-ide')?.addEventListener('click', () => {
+      if (this.codeIDE) this.codeIDE.open();
+    });
+    document.getElementById('btn-launch-rocket')?.addEventListener('click', () => {
+      if (this.zoneInteractions) this.zoneInteractions.triggerRocketLaunch();
+    });
+    document.getElementById('btn-act-launch-rocket')?.addEventListener('click', () => {
+      if (this.zoneInteractions) this.zoneInteractions.triggerRocketLaunch();
+    });
+    document.getElementById('btn-act-board-transit')?.addEventListener('click', () => {
+      if (this.zoneInteractions) this.zoneInteractions.toggleTransitCabRide();
+    });
+    document.getElementById('btn-act-align-ruins')?.addEventListener('click', () => {
+      if (this.zoneInteractions) this.zoneInteractions.solveRuinsLaserPuzzle();
+    });
+    document.getElementById('btn-act-sub-dive')?.addEventListener('click', () => {
+      if (this.zoneInteractions) this.zoneInteractions.toggleSubmarineDive();
+    });
+    document.getElementById('btn-spray-graffiti')?.addEventListener('click', () => {
+      if (this.zoneInteractions) this.zoneInteractions.sprayGraffiti();
+    });
+
     // Mobile & Touch Gesture Support for Sliders (Fix 5)
     const rangeSliders = [this.timelineSlider, document.getElementById('time-of-day-slider')].filter(Boolean);
     rangeSliders.forEach(slider => {
@@ -1181,11 +1215,23 @@ class SkillverseApp {
         this.setCameraMode('orbit');
         if (btnCinematic && btnOrbit && btnExplorer) this.updateActiveBtn([btnCinematic, btnOrbit, btnExplorer], btnOrbit);
       } else if (e.key === 'e' || e.key === 'E') {
-        const btnCinematic = document.getElementById('mode-cinematic');
-        const btnOrbit = document.getElementById('mode-orbit');
-        const btnExplorer = document.getElementById('mode-explorer');
-        this.setCameraMode('explorer');
-        if (btnCinematic && btnOrbit && btnExplorer) this.updateActiveBtn([btnCinematic, btnOrbit, btnExplorer], btnExplorer);
+        if (this.cameraMode === 'explorer' && this.zoneInteractions) {
+          // In explorer mode, E interacts / toggles transit cab ride
+          this.zoneInteractions.toggleTransitCabRide();
+        } else {
+          const btnCinematic = document.getElementById('mode-cinematic');
+          const btnOrbit = document.getElementById('mode-orbit');
+          const btnExplorer = document.getElementById('mode-explorer');
+          this.setCameraMode('explorer');
+          if (btnCinematic && btnOrbit && btnExplorer) this.updateActiveBtn([btnCinematic, btnOrbit, btnExplorer], btnExplorer);
+        }
+      } else if (e.key === 'k' || e.key === 'K') {
+        if (this.codeIDE) {
+          if (this.codeIDE.isOpen) this.codeIDE.close();
+          else this.codeIDE.open();
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        if (this.zoneInteractions) this.zoneInteractions.triggerRocketLaunch();
       } else if (e.key === 'm' || e.key === 'M') {
         if (e.shiftKey) {
           document.getElementById('btn-world-menu')?.click();
@@ -1206,6 +1252,7 @@ class SkillverseApp {
         document.getElementById('waypoints-modal')?.classList.remove('visible');
         document.getElementById('activities-modal')?.classList.remove('visible');
         if (this.customizerModal) this.customizerModal.close();
+        if (this.codeIDE) this.codeIDE.close();
       }
     });
   }
@@ -1374,6 +1421,8 @@ class SkillverseApp {
   setCameraMode(mode) {
     this.cameraMode = mode;
     this.coordinator.setCameraMode(mode);
+    if (this.locomotion) this.locomotion.enabled = false;
+
     if (mode === 'cinematic') {
       this.controls.enabled = false;
       this.sequencer.isPlaying = true;
@@ -1388,13 +1437,14 @@ class SkillverseApp {
     } else if (mode === 'explorer') {
       this.controls.enabled = false;
       this.sequencer.isPlaying = false;
-      this.camera.position.set(-9.5, 1.68, 53.5);
-      this.camera.lookAt(-9.5, 1.6, 65);
+      if (this.locomotion) {
+        this.locomotion.enabled = true;
+      }
       this.camera.fov = 60;
       this.camera.updateProjectionMatrix();
       document.body.classList.add('free-roam');
       document.getElementById('inspector-card').classList.remove('visible');
-      this.showToast('STREET EXPLORER: FIRST-PERSON VIEW AT 1.68M EYE HEIGHT');
+      this.showToast('STREET EXPLORER: FULL WASD / GAMEPAD LOCOMOTION ACTIVE (V: 1st/3rd Person • Shift: Sprint • Space: Jump)');
     }
   }
 
@@ -1534,6 +1584,16 @@ class SkillverseApp {
 
       // Stage 5: Multiplayer Peer Synchronization
       this.multiplayer = new MultiplayerSyncEngine(this.scene, this.explorer);
+
+      // Stage 1 & 5 Additions: Manual Locomotion Controller & Code IDE Sandbox
+      this.locomotion = new AvatarLocomotionController(
+        this.explorer,
+        this.camera,
+        this.renderer.domElement,
+        this.worldManager.terrain,
+        this.audioEngine
+      );
+      this.codeIDE = new HolographicCodeIDESandbox(this);
     } catch (err) {
       console.warn('[Skillverse] initStageEnhancements non-fatal warning:', err);
     }
@@ -1555,11 +1615,15 @@ class SkillverseApp {
     return this.customizerModal;
   }
 
+  // Fix 10: Canvas Window Resize Debounce & Aspect Ratio Matrix Sync
   onResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    if (this.postProcessing) this.postProcessing.setSize(window.innerWidth, window.innerHeight);
+    if (this._resizeRafId) cancelAnimationFrame(this._resizeRafId);
+    this._resizeRafId = requestAnimationFrame(() => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      if (this.postProcessing) this.postProcessing.setSize(window.innerWidth, window.innerHeight);
+    });
   }
 
   animate() {
@@ -1574,9 +1638,20 @@ class SkillverseApp {
       const isCloudDescent = (this.camera.position.y > 220 && (this.cameraMode === 'cinematic' ? this.sequencer.currentTime < 4.5 : true));
       const rainIntensity = isCloudDescent ? Math.min(1.0, Math.max(0.0, (this.camera.position.y - 220) / 180)) : 0.0;
       this.postProcessing.setRainIntensity(rainIntensity, time);
+
+      // Fix 9: Directional Sun Glare Raycast Occlusion Check
+      if (this.worldManager?.sunLight) {
+        const toSun = new THREE.Vector3().subVectors(this.worldManager.sunLight.position, this.camera.position).normalize();
+        const camDir = new THREE.Vector3();
+        this.camera.getWorldDirection(camDir);
+        const dot = camDir.dot(toSun);
+        const inCity = Math.hypot(this.camera.position.x, this.camera.position.z) < 140;
+        const occluded = (dot > 0.6 && inCity && this.camera.position.y < 45) ? 0.75 : 0.0;
+        this.postProcessing.setSunGlareOcclusion(occluded);
+      }
     }
 
-    // 1. Update Camera Sequencer
+    // 1. Update Camera Sequencer or Manual Locomotion
     if (this.cameraMode === 'cinematic') {
       this.sequencer.update(delta);
       this.updateTimelineUI(this.sequencer.currentTime);
@@ -1585,13 +1660,22 @@ class SkillverseApp {
       document.getElementById('hud-phase').textContent = info.title;
       document.getElementById('hud-altitude').textContent = info.altitude;
       document.getElementById('hud-zone').textContent = info.zone;
+    } else if (this.cameraMode === 'explorer') {
+      // Major 1: Manual WASD / Gamepad Locomotion
+      if (this.locomotion && this.locomotion.enabled) {
+        this.locomotion.update(delta);
+      }
+      const alt = Math.max(0, this.camera.position.y);
+      const pressure = 1013.25 * Math.exp(-alt / 8400);
+      const altElem = document.getElementById('hud-altitude');
+      if (altElem) altElem.textContent = `${Math.round(alt)} M • ${Math.round(pressure)} hPa`;
     } else if (this.controls.enabled) {
       this.controls.update();
       document.getElementById('hud-altitude').textContent = `${Math.round(this.camera.position.y)} M`;
     }
 
-    // 2. Update Living World Systems & Synchronized Maglev Station Transit
-    this.worldManager.update(delta, time, this.sequencer.currentTime);
+    // 2. Update Living World Systems with Camera Position (Fix 2 & 6: Fog & Shadow Cascade bounds)
+    this.worldManager.update(delta, time, this.sequencer.currentTime, this.camera.position);
 
     // 2b. High Atmosphere Flocking Birds (0–4s Cloud Descent Visual)
     if (this.birdFlock) {
@@ -1639,9 +1723,17 @@ class SkillverseApp {
     if (this.biomeWildlife) this.biomeWildlife.update(delta, time);
     if (this.multiplayer) this.multiplayer.update(delta, time);
 
-    // 4b. Update Holographic 3D Globe GPS Radar HUD
+    // 4b. Update Holographic 3D Globe GPS Radar HUD (with Weather Isobars & Compass dial)
     if (this.radar) {
-      this.radar.update(delta, this.camera.position, this.activeRobots);
+      const dir = new THREE.Vector3();
+      this.camera.getWorldDirection(dir);
+      const yaw = Math.atan2(dir.x, dir.z);
+      const weatherData = this.weatherEngine ? {
+        state: this.weatherEngine.currentState,
+        windVec: this.weatherEngine.getWindVector(),
+        intensity: this.weatherEngine.rainIntensity
+      } : null;
+      this.radar.update(delta, this.explorer?.group?.position || this.camera.position, this.activeRobots, weatherData, yaw);
     }
 
     // 4c. Update Picture-in-Picture Secondary FPV Viewport (Only when enabled & throttled to 15 FPS)

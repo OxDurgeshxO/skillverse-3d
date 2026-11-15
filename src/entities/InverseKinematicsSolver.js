@@ -57,8 +57,9 @@ export class InverseKinematicsSolver {
 
   /**
    * Applies IK foot correction to a robot leg group
+   * Fix 5: Normal Alignment on Curbs and Slopes
    */
-  static plantFoot(legGroup, targetGroundY, currentHipY, l1 = 0.12, l2 = 0.12) {
+  static plantFoot(legGroup, targetGroundY, currentHipY, l1 = 0.12, l2 = 0.12, surfaceNormal = null) {
     if (!legGroup) return;
 
     const dy = targetGroundY - currentHipY;
@@ -73,6 +74,20 @@ export class InverseKinematicsSolver {
     const knee = legGroup.children?.find(c => c.name === 'knee' || c.userData?.isKnee);
     if (knee) {
       knee.rotation.x = ik.kneePitch;
+    }
+
+    // Fix 5: Robot Foot Normal Alignment on Curbs and Slopes
+    const foot = legGroup.children?.find(c => c.name === 'foot' || c.userData?.isFoot);
+    if (surfaceNormal) {
+      const slopePitch = Math.atan2(surfaceNormal.z || 0, surfaceNormal.y || 1);
+      const slopeRoll = Math.atan2(-(surfaceNormal.x || 0), surfaceNormal.y || 1);
+      if (foot) {
+        foot.rotation.x = -ik.hipPitch - (knee ? knee.rotation.x : 0) + slopePitch;
+        foot.rotation.z = slopeRoll;
+      }
+      ik.surfaceNormal = surfaceNormal;
+      ik.slopePitch = slopePitch;
+      ik.slopeRoll = slopeRoll;
     }
 
     return ik;

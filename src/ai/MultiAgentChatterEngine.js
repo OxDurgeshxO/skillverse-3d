@@ -14,6 +14,8 @@ export class MultiAgentChatterEngine {
     this.activeConversations = new Map();
     this.chatterCooldown = 0;
     this.activeSpeechBubbles = [];
+    this.bubblePool = [];
+    this.initBubblePool();
 
     // The 4 Planetary Skill Quests
     this.quests = [
@@ -72,6 +74,58 @@ export class MultiAgentChatterEngine {
     ];
   }
 
+  /**
+   * Fix 4: Speech Bubble DOM Element Pool Recycling in Chatter Engine
+   * Eliminates garbage collection churn with a fixed 12-element pool
+   */
+  initBubblePool() {
+    this.bubblePool = [];
+    if (typeof document !== 'undefined') {
+      const container = document.getElementById('hud-speech-container') || document.body;
+      for (let i = 0; i < 12; i++) {
+        const el = document.createElement('div');
+        el.className = 'speech-bubble-pooled';
+        el.style.display = 'none';
+        el.style.position = 'absolute';
+        el.style.pointerEvents = 'none';
+        el.style.zIndex = '80';
+        el.style.padding = '4px 8px';
+        el.style.borderRadius = '6px';
+        el.style.background = 'rgba(15, 23, 42, 0.85)';
+        el.style.color = '#38bdf8';
+        el.style.font = '10px monospace';
+        el.style.border = '1px solid rgba(56, 189, 248, 0.4)';
+        container.appendChild(el);
+        this.bubblePool.push({ el, active: false, life: 0 });
+      }
+    }
+  }
+
+  spawnPooledBubble(text, x = 0, y = 0) {
+    const idleBubble = this.bubblePool.find(b => !b.active);
+    if (!idleBubble) return null;
+
+    idleBubble.active = true;
+    idleBubble.life = 3.5;
+    idleBubble.el.textContent = text;
+    idleBubble.el.style.display = 'block';
+    idleBubble.el.style.left = `${Math.round(x)}px`;
+    idleBubble.el.style.top = `${Math.round(y)}px`;
+    return idleBubble;
+  }
+
+  updatePool(delta) {
+    this.bubblePool.forEach(b => {
+      if (b.active) {
+        b.life -= delta;
+        if (b.life <= 0) {
+          b.active = false;
+          b.el.style.display = 'none';
+        }
+      }
+    });
+  }
+
   acceptQuest(questId) {
     const q = this.quests.find(item => item.id === questId);
     if (q && q.status === 'AVAILABLE') {
@@ -117,6 +171,7 @@ export class MultiAgentChatterEngine {
   }
 
   update(delta, time, activeRobots = []) {
+    this.updatePool(delta);
     this.chatterCooldown -= delta;
 
     // Check proximity between robot pairs (d < 2.5m)

@@ -6,6 +6,7 @@ export class CreativeArtDistrict {
     this.group = new THREE.Group();
     this.group.position.set(-120, 5, 120);
     this.kineticSculptures = [];
+    this.graffitiDecals = [];
     this.buildZone();
     this.scene.add(this.group);
   }
@@ -78,6 +79,25 @@ export class CreativeArtDistrict {
       col.position.set(Math.cos(angle) * 14, 8, Math.sin(angle) * 14);
       this.group.add(col);
     }
+  }
+
+  /**
+   * Medium 4: Creative Art District Neon Decal Graffiti Spray
+   */
+  addGraffitiDecal(x = 0, y = 2.5, z = 0, colorHex = '#00f0ff') {
+    const decalGeom = new THREE.PlaneGeometry(2.4, 2.4);
+    const decalMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(colorHex),
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+    const decal = new THREE.Mesh(decalGeom, decalMat);
+    decal.position.set(x, y, z);
+    decal.rotation.y = (Math.random() - 0.5) * 0.4;
+    this.group.add(decal);
+    this.graffitiDecals.push(decal);
+    return decal;
   }
 
   update(time) {

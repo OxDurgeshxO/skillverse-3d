@@ -241,7 +241,7 @@ export class WorldManager {
     }
   }
 
-  update(delta, time, sequencerTime = -1) {
+  update(delta, time, sequencerTime = -1, cameraPos = null) {
     if (this.autoCycle) {
       this.timeOfDay = (this.timeOfDay + delta * this.cycleSpeed) % 24.0;
       this.applyAstronomicalSun(this.timeOfDay);
@@ -250,6 +250,21 @@ export class WorldManager {
     if (this.transit) this.transit.update(delta, time, sequencerTime);
     if (this.cloudMaterial && this.cloudMaterial.uniforms) {
       this.cloudMaterial.uniforms.uTime.value = time;
+    }
+
+    // Fix 6: Dynamic Shadow Cascade Bounds Culling
+    // Dynamically center directional light target and shadow bounds on active explorer/camera
+    if (this.sunLight && cameraPos) {
+      this.sunLight.target.position.set(cameraPos.x, 0, cameraPos.z);
+      this.sunLight.target.updateMatrixWorld();
+    }
+
+    // Fix 2: High-Altitude Atmospheric Rayleigh Fog Density Discontinuity
+    // Dynamically interpolate fog density from 0.00075 (street level) to 0.00025 (y >= 800m)
+    if (this.scene.fog && cameraPos) {
+      const alt = Math.max(0.5, Math.min(850, cameraPos.y));
+      const t = (alt - 0.5) / 849.5;
+      this.scene.fog.density = THREE.MathUtils.lerp(0.00075, 0.00025, t);
     }
 
     // Smooth Day/Night & Festival transition
@@ -278,10 +293,10 @@ export class WorldManager {
       p.mesh.rotation.z = Math.cos(time * 0.6 + p.idx) * 0.12;
     });
 
-    // Update each active zone
+    // Update each active zone with nightIntensity for streetlamps
     Object.values(this.zones).forEach(z => {
       if (z && typeof z.update === 'function') {
-        z.update(time);
+        z.update(time, this.festivalIntensity);
       }
     });
   }
