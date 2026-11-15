@@ -40,14 +40,14 @@ export class WorldManager {
     this.sunLight = new THREE.DirectionalLight(0xffa756, 3.2);
     this.sunLight.position.set(350, 180, -220);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 2048;
-    this.sunLight.shadow.mapSize.height = 2048;
+    this.sunLight.shadow.mapSize.width = 1024;
+    this.sunLight.shadow.mapSize.height = 1024;
     this.sunLight.shadow.camera.near = 10;
-    this.sunLight.shadow.camera.far = 1500;
-    this.sunLight.shadow.camera.left = -300;
-    this.sunLight.shadow.camera.right = 300;
-    this.sunLight.shadow.camera.top = 300;
-    this.sunLight.shadow.camera.bottom = -300;
+    this.sunLight.shadow.camera.far = 1200;
+    this.sunLight.shadow.camera.left = -160;
+    this.sunLight.shadow.camera.right = 160;
+    this.sunLight.shadow.camera.top = 160;
+    this.sunLight.shadow.camera.bottom = -160;
     this.sunLight.shadow.bias = -0.0005;
     this.scene.add(this.sunLight);
 

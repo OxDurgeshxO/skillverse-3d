@@ -18,7 +18,7 @@ export class WeatherEngine {
 
     this.rainParticles = null;
     this.rainGeometry = null;
-    this.rainCount = 5000;
+    this.rainCount = 1500; // Right-sized from 5,000 for 60 FPS performance without visual degradation
 
     if (this.scene) {
       this.initRainParticles();
@@ -81,30 +81,33 @@ export class WeatherEngine {
     const isRaining = this.currentWeather === 'RAIN' || (this.targetWeather === 'RAIN' && this.weatherBlend > 0.1);
     const rainFactor = isRaining ? (this.currentWeather === 'RAIN' ? 1.0 : this.weatherBlend) : 0.0;
 
-    // 1. Update volumetric rain particle positions
+    // 1. Update volumetric rain particle positions (Only when raining or fading out)
     if (this.rainParticles && this.rainGeometry) {
-      this.rainParticles.material.opacity = THREE.MathUtils.lerp(this.rainParticles.material.opacity, isRaining ? 0.75 : 0.0, delta * 3.0);
+      if (!isRaining && this.rainParticles.material.opacity <= 0.01) {
+        this.rainParticles.visible = false;
+        this.rainParticles.material.opacity = 0.0;
+      } else {
+        this.rainParticles.visible = true;
+        this.rainParticles.material.opacity = THREE.MathUtils.lerp(this.rainParticles.material.opacity, isRaining ? 0.75 : 0.0, delta * 3.0);
 
-      if (this.rainParticles.material.opacity > 0.01 && camera) {
-        // Anchor rain volume around active camera
-        this.rainParticles.position.x = camera.position.x;
-        this.rainParticles.position.z = camera.position.z;
+        if (this.rainParticles.material.opacity > 0.01 && camera) {
+          this.rainParticles.position.x = camera.position.x;
+          this.rainParticles.position.z = camera.position.z;
 
-        const positions = this.rainGeometry.attributes.position.array;
-        const velocities = this.rainGeometry.attributes.velocity.array;
+          const positions = this.rainGeometry.attributes.position.array;
+          const velocities = this.rainGeometry.attributes.velocity.array;
 
-        for (let i = 0; i < this.rainCount; i++) {
-          positions[i * 3 + 1] -= velocities[i] * delta;
-          positions[i * 3 + 0] += Math.sin(time * 2.0 + i) * delta * 2.0; // Wind gust drift
+          for (let i = 0; i < this.rainCount; i++) {
+            positions[i * 3 + 1] -= velocities[i] * delta;
 
-          // Wrap raindrops above camera when hitting ground
-          if (positions[i * 3 + 1] < 0) {
-            positions[i * 3 + 1] = 80;
-            positions[i * 3 + 0] = (Math.random() - 0.5) * 140;
-            positions[i * 3 + 2] = (Math.random() - 0.5) * 140;
+            if (positions[i * 3 + 1] < 0) {
+              positions[i * 3 + 1] = 80;
+              positions[i * 3 + 0] = (Math.random() - 0.5) * 140;
+              positions[i * 3 + 2] = (Math.random() - 0.5) * 140;
+            }
           }
+          this.rainGeometry.attributes.position.needsUpdate = true;
         }
-        this.rainGeometry.attributes.position.needsUpdate = true;
       }
     }
 

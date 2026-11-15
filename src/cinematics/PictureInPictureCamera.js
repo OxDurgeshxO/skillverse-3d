@@ -5,11 +5,12 @@ import * as THREE from 'three';
  * Provides switchable feeds: Scout Drone FPV, Maglev front cab, and Orbital Launch Tower
  */
 export class PictureInPictureCamera {
-  constructor({ width = 280, height = 158 } = {}) {
+  constructor({ width = 280, height = 158, enabled = true } = {}) {
     this.width = width;
     this.height = height;
     this.activeMode = 'drone'; // 'drone' | 'maglev' | 'tower'
-    this.enabled = true;
+    this.enabled = enabled;
+    this.throttleElapsed = 0;
 
     this.camera = new THREE.PerspectiveCamera(65, width / height, 0.1, 1500);
     this.camera.position.set(0, 10, 0);
@@ -41,6 +42,7 @@ export class PictureInPictureCamera {
     const pipContainer = document.createElement('div');
     pipContainer.id = 'pip-container';
     pipContainer.className = 'pip-hud-card';
+    pipContainer.style.display = this.enabled ? 'block' : 'none';
     pipContainer.innerHTML = `
       <div class="pip-header">
         <div class="pip-title-wrap">
@@ -114,8 +116,13 @@ export class PictureInPictureCamera {
     }
   }
 
-  render(renderer, scene) {
+  render(renderer, scene, delta = 0.016) {
     if (!this.enabled || !renderer || !scene) return;
+
+    // Throttle PiP rendering to 15 FPS to eliminate GPU pipeline stalling
+    this.throttleElapsed = (this.throttleElapsed || 0) + delta;
+    if (this.throttleElapsed < 0.066) return;
+    this.throttleElapsed = 0;
 
     if (this.renderTarget && renderer.readRenderTargetPixels && this.targetCtx) {
       const currentRT = renderer.getRenderTarget();

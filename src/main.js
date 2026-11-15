@@ -360,7 +360,7 @@ class SkillverseApp {
   initRenderer() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25)); // Clamped to 1.25 to prevent 4K/Retina GPU fill rate saturation
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -840,6 +840,7 @@ class SkillverseApp {
     // Toggle PiP Multi-Cam Feed
     const btnTogglePiP = document.getElementById('btn-toggle-pip');
     if (btnTogglePiP) {
+      btnTogglePiP.textContent = this.pipCam?.enabled ? '🛰 PiP: ON' : '🛰 PiP: OFF';
       btnTogglePiP.addEventListener('click', () => {
         if (this.pipCam) {
           const active = this.pipCam.toggle();
@@ -889,6 +890,21 @@ class SkillverseApp {
           const mode = this.weatherEngine.toggleWeather();
           btnWeather.textContent = `🌦 Weather: ${mode}`;
           this.showToast(`ATMOSPHERE SHIFT: ${mode} CONDITIONS ENGAGED`);
+        }
+      });
+    }
+
+    // Performance Tier Toggle (60 FPS Performance vs Ultra Cinematic)
+    const btnPerfTier = document.getElementById('btn-perf-tier');
+    if (btnPerfTier) {
+      btnPerfTier.addEventListener('click', () => {
+        if (this.postProcessing) {
+          const isPerf = this.postProcessing.qualityTier !== 'PERFORMANCE';
+          const newTier = isPerf ? 'PERFORMANCE' : 'CINEMATIC';
+          this.postProcessing.setQualityTier(newTier);
+          btnPerfTier.textContent = isPerf ? '⚡ 60 FPS: ON' : '✨ Ultra Cinematic';
+          btnPerfTier.style.color = isPerf ? '#10b981' : '#38bdf8';
+          this.showToast(isPerf ? 'PERFORMANCE MODE ACTIVE: 60 FPS OPTIMIZED' : 'CINEMATIC ULTRA MODE ACTIVE');
         }
       });
     }
@@ -1101,6 +1117,8 @@ class SkillverseApp {
         document.getElementById('btn-world-menu')?.click();
       } else if (e.key === 'f' || e.key === 'F') {
         document.getElementById('btn-festival')?.click();
+      } else if (e.key === 'p' || e.key === 'P') {
+        document.getElementById('btn-toggle-pip')?.click();
       } else if (e.key === 'Escape') {
         document.getElementById('dialogue-terminal')?.classList.remove('open');
         document.getElementById('inspector-card')?.classList.remove('visible');
@@ -1401,17 +1419,17 @@ class SkillverseApp {
 
   initStageEnhancements() {
     try {
-      // Stage 3: Holographic GPS Globe Radar HUD & PiP Multi-Cam Viewport
+      // Stage 3: Holographic GPS Globe Radar HUD & PiP Multi-Cam Viewport (Disabled by default for 60 FPS)
       this.radar = new HolographicRadar({ planetRadius: 400 });
-      this.pipCam = new PictureInPictureCamera({ width: 280, height: 158 });
+      this.pipCam = new PictureInPictureCamera({ width: 280, height: 158, enabled: false });
       this.videoExporter = null; // Lazy loaded via dynamic import on click
 
       // Stage 4: Inhabitant Intelligence, 3D Robot Customizer & Crowd Pathfinding
       this.customizerModal = null; // Lazy loaded via dynamic import on click
       this.crowdEngine = new CrowdSimulationEngine(this.scene, { count: 32 });
 
-      // Stage 5: 50,000 GPU Particles, Water Buoyancy Physics, Voice Agent Bridge
-      this.gpuParticles = new GpuParticleSystem(this.scene, { count: 40000 });
+      // Stage 5: GPU Particles (Right-sized to 12,000 for sustained 60 FPS without overdraw), Water Buoyancy Physics, Voice Agent Bridge
+      this.gpuParticles = new GpuParticleSystem(this.scene, { count: 12000 });
       this.physicsWorld = new PhysicsWorld();
 
       // Register Harbor Cargo Ship to Ocean Wave Buoyancy
@@ -1529,10 +1547,10 @@ class SkillverseApp {
       this.radar.update(delta, this.camera.position, this.activeRobots);
     }
 
-    // 4c. Update Picture-in-Picture Secondary FPV Viewport
-    if (this.pipCam) {
+    // 4c. Update Picture-in-Picture Secondary FPV Viewport (Only when enabled & throttled to 15 FPS)
+    if (this.pipCam && this.pipCam.enabled) {
       this.pipCam.update(delta, time, { drone: this.scoutDrone, transit: this.worldManager.transit });
-      this.pipCam.render(this.renderer, this.scene);
+      this.pipCam.render(this.renderer, this.scene, delta);
     }
 
     // 4d. Footstep audio synths during Explorer walking
@@ -1543,24 +1561,28 @@ class SkillverseApp {
     // 5. Update Spatial Audio Listener & Doppler Emitters
     this.audioEngine.update(this.sequencer.currentTime, this.camera.position.y, this.camera);
 
-    // 6. FPS Telemetry
-    const fps = Math.round(1 / Math.max(delta, 0.001));
-    const fpsElem = document.getElementById('hud-fps');
-    if (fpsElem) fpsElem.textContent = `${fps} FPS`;
+    // 6. Throttled DOM Telemetry (4 Hz / 250ms) to prevent browser layout thrashing
+    this._telemetryTimer = (this._telemetryTimer || 0) + delta;
+    if (this._telemetryTimer >= 0.25) {
+      this._telemetryTimer = 0;
+      const fps = Math.round(1 / Math.max(delta, 0.001));
+      const fpsElem = document.getElementById('hud-fps');
+      if (fpsElem) fpsElem.textContent = `${fps} FPS`;
 
-    // Small 2: Compass Heading Dial & Altimeter
-    const dir = new THREE.Vector3();
-    this.camera.getWorldDirection(dir);
-    const deg = Math.round(((Math.atan2(dir.x, dir.z) * 180 / Math.PI) + 360) % 360);
-    const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    const card = cardinals[Math.round(deg / 45) % 8];
-    const headingElem = document.getElementById('hud-heading');
-    if (headingElem) headingElem.textContent = `${deg.toString().padStart(3, '0')}° ${card}`;
+      // Small 2: Compass Heading Dial & Altimeter
+      const dir = new THREE.Vector3();
+      this.camera.getWorldDirection(dir);
+      const deg = Math.round(((Math.atan2(dir.x, dir.z) * 180 / Math.PI) + 360) % 360);
+      const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const card = cardinals[Math.round(deg / 45) % 8];
+      const headingElem = document.getElementById('hud-heading');
+      if (headingElem) headingElem.textContent = `${deg.toString().padStart(3, '0')}° ${card}`;
 
-    // Small 5: Dynamic Favicon & Browser Title Telemetry
-    if (typeof document !== 'undefined') {
-      const activeZone = document.getElementById('hud-zone')?.textContent || 'ORBITAL VIEW';
-      document.title = `[${activeZone} • ${fps} FPS] Skillverse 3D`;
+      // Small 5: Dynamic Favicon & Browser Title Telemetry
+      if (typeof document !== 'undefined') {
+        const activeZone = document.getElementById('hud-zone')?.textContent || 'ORBITAL VIEW';
+        document.title = `[${activeZone} • ${fps} FPS] Skillverse 3D`;
+      }
     }
 
     // Weather Engine Update (Major 2)

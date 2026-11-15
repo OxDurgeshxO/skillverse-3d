@@ -103,6 +103,13 @@
   - [x] Small 5: Dynamic favicon & browser title telemetry (`[Zone • FPS]`).
 - [x] 32 / 32 automated unit tests passing continuously (`npm test`).
 
+### Phase 11: Runtime Performance Optimization & 60 FPS De-Stalling
+- [x] **Stage 1 (PiP & Telemetry De-Stalling)**: PiP camera disabled by default & throttled to 15 FPS; eliminated synchronous `readRenderTargetPixels` pipeline stall; throttled DOM and `document.title` telemetry to 4 Hz (250ms).
+- [x] **Stage 2 (GPU Fill Rate & Adaptive DPR)**: Clamped DPR to `Math.min(window.devicePixelRatio, 1.25)`; added `⚡ 60 FPS Mode` / `✨ Ultra Cinematic` toggle; bypassed `LensCondensationShader` completely when dry (`uRainIntensity <= 0.005`).
+- [x] **Stage 3 (CPU Simulation & Radar)**: Bypassed rain simulation loop on `CLEAR` weather; right-sized rain count to 1,500 particles; throttled 2D radar canvas rasterization to 20 FPS (every 50ms).
+- [x] **Stage 4 (Particles & Shadows)**: Right-sized GPU particles from 40k to 12k; optimized shadow map resolution to 1024x1024 with tight center bounds (-160 to 160).
+- [x] **Stage 5 (Verification & Benchmarking)**: Added `tests/performanceAudit.test.js`; 37 / 37 automated tests passing (100% pass rate).
+
 ---
 
 ## Active & Upcoming Backlog

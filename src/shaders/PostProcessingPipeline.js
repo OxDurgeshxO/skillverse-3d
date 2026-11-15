@@ -252,9 +252,10 @@ export class PostProcessingPipeline {
     this.tiltShiftPass.uniforms.resolution.value.set(width, height);
     this.composer.addPass(this.tiltShiftPass);
 
-    // 4. Optical Lens Condensation & Droplet Refraction Pass
+    // 4. Optical Lens Condensation & Droplet Refraction Pass (Disabled by default until rain/cloud descent)
     this.lensCondensationPass = new ShaderPass(LensCondensationShader);
     this.lensCondensationPass.uniforms.resolution.value.set(width, height);
+    this.lensCondensationPass.enabled = false;
     this.composer.addPass(this.lensCondensationPass);
 
     // 5. Professional 4K Cinematic LUT Color Grading Pass (Medium 2)
@@ -288,8 +289,41 @@ export class PostProcessingPipeline {
 
   setRainIntensity(intensity = 0.0, time = 0.0) {
     if (this.isMock || !this.lensCondensationPass) return;
-    this.lensCondensationPass.uniforms.uRainIntensity.value = intensity;
-    this.lensCondensationPass.uniforms.uTime.value = time;
+    const shouldEnable = intensity > 0.005;
+    this.lensCondensationPass.enabled = shouldEnable;
+    if (shouldEnable) {
+      this.lensCondensationPass.uniforms.uRainIntensity.value = intensity;
+      this.lensCondensationPass.uniforms.uTime.value = time;
+    }
+  }
+
+  setQualityTier(tier = 'BALANCED') {
+    this.qualityTier = tier;
+    if (this.isMock || !this.composer) return;
+    if (tier === 'PERFORMANCE') {
+      if (this.tiltShiftPass) this.tiltShiftPass.enabled = false;
+      if (this.bloomPass) {
+        this.bloomPass.strength = 0.35;
+        this.bloomPass.radius = 0.2;
+      }
+    } else if (tier === 'CINEMATIC') {
+      if (this.tiltShiftPass) this.tiltShiftPass.enabled = true;
+      if (this.bloomPass) {
+        this.bloomPass.strength = 0.55;
+        this.bloomPass.radius = 0.35;
+      }
+    } else {
+      if (this.tiltShiftPass) this.tiltShiftPass.enabled = true;
+      if (this.bloomPass) {
+        this.bloomPass.strength = 0.45;
+        this.bloomPass.radius = 0.25;
+      }
+    }
+  }
+
+  togglePipeline() {
+    this.enabled = !this.enabled;
+    return this.enabled;
   }
 
   setLUTMode(mode) {

@@ -26,7 +26,7 @@ test('WeatherEngine: Cycles procedural weather states and updates particle posit
   // Update weather animation
   engine.update(0.016, 1.0, camera);
   assert.ok(engine.rainGeometry !== null, 'Rain geometry initialized');
-  assert.strictEqual(engine.rainGeometry.attributes.position.count, 5000);
+  assert.strictEqual(engine.rainGeometry.attributes.position.count, 1500);
 
   engine.dispose();
 });
