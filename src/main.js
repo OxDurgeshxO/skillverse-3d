@@ -8,6 +8,15 @@ import { SpatialAudioEngine } from './audio/SpatialAudioEngine.js';
 import { STL3DPrintExporter } from './exporters/STL3DPrintExporter.js';
 import { createHologramMaterial } from './shaders/hologramShader.js';
 import { SkillverseCoordinator } from './core/SkillverseCoordinator.js';
+import { PostProcessingPipeline } from './shaders/PostProcessingPipeline.js';
+import { HolographicRadar } from './ui/HolographicRadar.js';
+import { PictureInPictureCamera } from './cinematics/PictureInPictureCamera.js';
+import { VideoRecorderExporter } from './exporters/VideoRecorderExporter.js';
+import { RobotCustomizerModal } from './ui/RobotCustomizerModal.js';
+import { CrowdSimulationEngine } from './world/CrowdSimulationEngine.js';
+import { GpuParticleSystem } from './shaders/GpuParticleSystem.js';
+import { PhysicsWorld } from './physics/PhysicsWorld.js';
+import { RobotVoiceAgentBridge } from './ai/RobotVoiceAgentBridge.js';
 
 /**
  * Security & Input Validation Helpers
@@ -307,12 +316,14 @@ class SkillverseApp {
     this.initRenderer();
     this.initScene();
     this.initCamera();
+    this.initPostProcessing();
     this.initWorld();
     this.initCharacters();
     this.initFlockingBirds();
     this.initSequencer();
     this.initAudio();
     this.initUI();
+    this.initStageEnhancements();
 
     window.addEventListener('resize', () => this.onResize());
     this.animate();
@@ -339,9 +350,14 @@ class SkillverseApp {
       console.info('[Skillverse] WebGL Context Restored! Re-initializing viewport.');
       this.showToast('✅ GPU CONTEXT RESTORED. RESUMING ENGINE.');
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      if (this.postProcessing) this.postProcessing.setSize(window.innerWidth, window.innerHeight);
     });
 
     this.container.appendChild(this.renderer.domElement);
+  }
+
+  initPostProcessing() {
+    this.postProcessing = new PostProcessingPipeline(this.renderer, this.scene, this.camera);
   }
 
   initScene() {
@@ -672,6 +688,88 @@ class SkillverseApp {
         this.showToast('WEBXR NOT AVAILABLE IN CURRENT BROWSER ENGINE');
       }
     });
+
+    // Astronomical 24H Day/Night Slider
+    const timeSlider = document.getElementById('time-of-day-slider');
+    const timeLabel = document.getElementById('time-of-day-label');
+    if (timeSlider && timeLabel) {
+      timeSlider.addEventListener('input', (e) => {
+        const h = clampNumber(e.target.value, 0, 24, 17.5);
+        this.worldManager.setTimeOfDay(h);
+        const hrs = Math.floor(h);
+        const mins = Math.floor((h - hrs) * 60).toString().padStart(2, '0');
+        const phase = (h >= 5.5 && h < 8.0) ? 'Sunrise' : (h >= 11.0 && h <= 14.0) ? 'Solar Noon' : (h >= 16.5 && h <= 19.5) ? 'Golden Hour' : 'Night Sky';
+        timeLabel.textContent = `${hrs.toString().padStart(2, '0')}:${mins} (${phase})`;
+      });
+    }
+
+    // 4K Photo Studio Snapshot Capture
+    const btnSnapshot = document.getElementById('btn-take-snapshot');
+    if (btnSnapshot) {
+      btnSnapshot.addEventListener('click', () => {
+        if (this.videoExporter) {
+          const url = this.videoExporter.captureSnapshot(`skillverse-4k-frame-${Date.now()}.png`);
+          if (url) this.showToast('CAPTURED HIGH-RES 4K VIEWPORT SNAPSHOT (.PNG)');
+        }
+      });
+    }
+
+    // 10s Video Clip Recording
+    const btnRecordClip = document.getElementById('btn-record-clip');
+    if (btnRecordClip) {
+      btnRecordClip.addEventListener('click', () => {
+        if (!this.videoExporter) return;
+        if (!this.videoExporter.isRecording) {
+          try {
+            this.videoExporter.startRecording({ fps: 60 });
+            btnRecordClip.textContent = '⏹ Stop (Rec)';
+            btnRecordClip.style.color = '#ef4444';
+            btnRecordClip.style.borderColor = '#ef4444';
+            this.showToast('RECORDING 60 FPS CINEMATIC STREAM (CLICK TO FINISH)...');
+          } catch (e) {
+            this.showToast('RECORDING NOT SUPPORTED: ' + e.message);
+          }
+        } else {
+          this.videoExporter.stopRecording();
+          btnRecordClip.textContent = '🎥 Record 10s';
+          btnRecordClip.style.color = '';
+          btnRecordClip.style.borderColor = '';
+          this.showToast('SAVING CINEMATIC RECORDING (.WEBM / .MP4)...');
+        }
+      });
+    }
+
+    // Toggle PiP Multi-Cam Feed
+    const btnTogglePiP = document.getElementById('btn-toggle-pip');
+    if (btnTogglePiP) {
+      btnTogglePiP.addEventListener('click', () => {
+        if (this.pipCam) {
+          const active = this.pipCam.toggle();
+          btnTogglePiP.textContent = active ? '🛰 PiP: ON' : '🛰 PiP: OFF';
+          this.showToast(active ? 'PICTURE-IN-PICTURE MULTI-CAM FEED ACTIVATED' : 'PICTURE-IN-PICTURE MULTI-CAM FEED HIDDEN');
+        }
+      });
+    }
+
+    // 3D Robot Builder Customizer Modal
+    const btnOpenCustomizer = document.getElementById('btn-open-customizer');
+    if (btnOpenCustomizer) {
+      btnOpenCustomizer.addEventListener('click', () => {
+        if (this.customizerModal) {
+          this.customizerModal.open();
+        }
+      });
+    }
+
+    // Voice Chat Button in Dialogue Terminal
+    const btnVoiceChat = document.getElementById('btn-voice-chat');
+    if (btnVoiceChat) {
+      btnVoiceChat.addEventListener('click', () => {
+        if (this.voiceBridge) {
+          this.voiceBridge.toggleListening();
+        }
+      });
+    }
   }
 
   openDialogue(entry) {
@@ -910,10 +1008,38 @@ class SkillverseApp {
     this._toastTimer = setTimeout(() => toast.classList.remove('visible'), 3200);
   }
 
+  initStageEnhancements() {
+    try {
+      // Stage 3: Holographic GPS Globe Radar HUD & PiP Multi-Cam & Video Studio
+      this.radar = new HolographicRadar({ planetRadius: 400 });
+      this.pipCam = new PictureInPictureCamera({ width: 280, height: 158 });
+      this.videoExporter = new VideoRecorderExporter(this.renderer?.domElement);
+
+      // Stage 4: Inhabitant Intelligence, 3D Robot Customizer & Crowd Pathfinding
+      this.customizerModal = new RobotCustomizerModal(this);
+      this.crowdEngine = new CrowdSimulationEngine(this.scene, { count: 32 });
+
+      // Stage 5: 50,000 GPU Particles, Water Buoyancy Physics, Voice Agent Bridge
+      this.gpuParticles = new GpuParticleSystem(this.scene, { count: 40000 });
+      this.physicsWorld = new PhysicsWorld();
+
+      // Register Harbor Cargo Ship to Ocean Wave Buoyancy
+      const harborShip = this.worldManager?.zones?.harbor?.group?.children?.find(c => c.name === 'cargo_ship' || c.userData?.isShip);
+      if (harborShip) {
+        this.physicsWorld.addFloatingBody(harborShip, { mass: 800, waterlineY: 0.0 });
+      }
+
+      this.voiceBridge = new RobotVoiceAgentBridge(this.audioEngine, this);
+    } catch (err) {
+      console.warn('[Skillverse] initStageEnhancements non-fatal warning:', err);
+    }
+  }
+
   onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    if (this.postProcessing) this.postProcessing.setSize(window.innerWidth, window.innerHeight);
   }
 
   animate() {
@@ -971,15 +1097,40 @@ class SkillverseApp {
       this.robotBuilder.animateRobot(r.mesh, time, r.isWalking, r.speed);
     });
 
-    // 4. Update Spatial Audio
-    this.audioEngine.update(this.sequencer.currentTime, this.camera.position.y);
+    // 4. Update Autonomous Crowd Simulation & High-Density GPU Particles
+    if (this.crowdEngine) this.crowdEngine.update(delta, time);
+    if (this.gpuParticles) this.gpuParticles.update(time);
+    if (this.physicsWorld) this.physicsWorld.update(delta, time);
 
-    // 5. FPS Telemetry
+    // 4b. Update Holographic 3D Globe GPS Radar HUD
+    if (this.radar) {
+      this.radar.update(delta, this.camera.position, this.activeRobots);
+    }
+
+    // 4c. Update Picture-in-Picture Secondary FPV Viewport
+    if (this.pipCam) {
+      this.pipCam.update(delta, time, { drone: this.scoutDrone, transit: this.worldManager.transit });
+      this.pipCam.render(this.renderer, this.scene);
+    }
+
+    // 4d. Footstep audio synths during Explorer walking
+    if (this.cameraMode === 'explorer' && Math.sin(time * 8.0) > 0.96) {
+      this.audioEngine.playFootstep('asphalt', this.camera.position);
+    }
+
+    // 5. Update Spatial Audio Listener & Doppler Emitters
+    this.audioEngine.update(this.sequencer.currentTime, this.camera.position.y, this.camera);
+
+    // 6. FPS Telemetry
     const fps = Math.round(1 / Math.max(delta, 0.001));
     document.getElementById('hud-fps').textContent = `${fps} FPS`;
 
-    // 6. Render Frame
-    this.renderer.render(this.scene, this.camera);
+    // 7. Render Post-Processing Pipeline (Unreal Bloom & Miniature Tilt-Shift)
+    if (this.postProcessing) {
+      this.postProcessing.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }
 

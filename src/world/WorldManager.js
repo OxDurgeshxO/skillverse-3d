@@ -20,6 +20,9 @@ export class WorldManager {
     this.scene = scene;
     this.zones = {};
     this.isNight = false;
+    this.timeOfDay = 17.5; // Default: 17:30 (Golden hour)
+    this.autoCycle = false;
+    this.cycleSpeed = 0.2; // Hours per second if auto-cycle enabled
     this.festivalIntensity = 0.0;
     this.festivalPillars = [];
 
@@ -184,10 +187,65 @@ export class WorldManager {
 
   toggleFestival() {
     this.isNight = !this.isNight;
+    this.timeOfDay = this.isNight ? 23.0 : 17.5;
+    this.applyAstronomicalSun(this.timeOfDay);
     return this.isNight;
   }
 
+  /**
+   * Continuous 24-Hour Astronomical Day/Night Cycle
+   * @param {number} hours - Time in hours [0.0 - 24.0]
+   */
+  setTimeOfDay(hours) {
+    this.timeOfDay = Math.max(0, Math.min(24, hours));
+    this.isNight = (this.timeOfDay < 5.5 || this.timeOfDay > 19.5);
+    this.applyAstronomicalSun(this.timeOfDay);
+  }
+
+  applyAstronomicalSun(hours) {
+    // Astronomical angle: 0h = midnight (-Z/nadir), 6h = dawn (+X), 12h = solar noon (+Y zenith), 18h = sunset (-X)
+    const solarAngle = ((hours - 6.0) / 24.0) * Math.PI * 2.0;
+
+    const sunDist = 520;
+    const sunX = Math.cos(solarAngle) * sunDist;
+    const sunY = Math.sin(solarAngle) * sunDist * 0.85;
+    const sunZ = -Math.sin(solarAngle * 0.5) * 260;
+
+    if (this.sunLight) {
+      this.sunLight.position.set(sunX, sunY, sunZ);
+      
+      // Daylight vs Golden Hour vs Night color & intensity ramp
+      if (hours >= 11.0 && hours <= 14.0) {
+        // High Noon: Crisp daylight white (6500K)
+        this.sunLight.color.setHex(0xffffff);
+        this.sunLight.intensity = 3.6;
+      } else if ((hours >= 5.5 && hours < 8.0) || (hours >= 16.5 && hours <= 19.5)) {
+        // Golden Hour / Sunrise (3200K warm gold & peach)
+        this.sunLight.color.setHex(0xffa756);
+        this.sunLight.intensity = 2.8;
+      } else if (hours < 5.0 || hours > 20.0) {
+        // Deep Midnight: Cool moonlight blue
+        this.sunLight.color.setHex(0x60a5fa);
+        this.sunLight.intensity = 0.4;
+      } else {
+        // Twilight transitions
+        this.sunLight.color.setHex(0xf472b6);
+        this.sunLight.intensity = 1.4;
+      }
+    }
+
+    if (this.skyDomeMat && this.skyDomeMat.uniforms) {
+      this.skyDomeMat.uniforms.uSunPos.value.set(sunX, Math.max(sunY, 10), sunZ);
+      const nightFactor = (hours < 6.0) ? (6.0 - hours) / 6.0 : (hours > 18.0) ? (hours - 18.0) / 6.0 : 0.0;
+      this.skyDomeMat.uniforms.uNightIntensity.value = Math.max(0.0, Math.min(1.0, nightFactor));
+    }
+  }
+
   update(delta, time, sequencerTime = -1) {
+    if (this.autoCycle) {
+      this.timeOfDay = (this.timeOfDay + delta * this.cycleSpeed) % 24.0;
+      this.applyAstronomicalSun(this.timeOfDay);
+    }
     if (this.terrain) this.terrain.update(time);
     if (this.transit) this.transit.update(delta, time, sequencerTime);
     if (this.cloudMaterial && this.cloudMaterial.uniforms) {

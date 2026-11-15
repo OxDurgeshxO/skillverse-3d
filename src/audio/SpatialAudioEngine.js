@@ -8,6 +8,8 @@ export class SpatialAudioEngine {
     this.robotChirpNode = null;
     this.masterGain = null;
     this.isInitialized = false;
+    this.positionalSources = [];
+    this.lastFootstepTime = 0;
   }
 
   init() {
@@ -179,8 +181,219 @@ export class SpatialAudioEngine {
     this.speakRobotVocal('coding');
   }
 
-  update(timelineSeconds, altitude) {
+  /**
+   * Update Web Audio 3D listener position & orientation based on Three.js camera
+   */
+  updateListener(camera) {
+    if (!this.isInitialized || !this.ctx || !this.ctx.listener || !camera) return;
+
+    try {
+      const p = camera.position;
+      const listener = this.ctx.listener;
+      const now = this.ctx.currentTime;
+
+      if (listener.positionX) {
+        listener.positionX.setTargetAtTime(p.x, now, 0.05);
+        listener.positionY.setTargetAtTime(p.y, now, 0.05);
+        listener.positionZ.setTargetAtTime(p.z, now, 0.05);
+      } else if (typeof listener.setPosition === 'function') {
+        listener.setPosition(p.x, p.y, p.z);
+      }
+
+      // Forward vector and Up vector
+      if (typeof camera.getWorldDirection === 'function') {
+        const forward = camera.getWorldDirection(new (camera.position.constructor)());
+        const up = camera.up || { x: 0, y: 1, z: 0 };
+        if (listener.forwardX) {
+          listener.forwardX.setTargetAtTime(forward.x, now, 0.05);
+          listener.forwardY.setTargetAtTime(forward.y, now, 0.05);
+          listener.forwardZ.setTargetAtTime(forward.z, now, 0.05);
+          listener.upX.setTargetAtTime(up.x, now, 0.05);
+          listener.upY.setTargetAtTime(up.y, now, 0.05);
+          listener.upZ.setTargetAtTime(up.z, now, 0.05);
+        } else if (typeof listener.setOrientation === 'function') {
+          listener.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+        }
+      }
+    } catch (err) {
+      // Audio listener update non-fatal guard
+    }
+  }
+
+  /**
+   * Create a 3D Positional PannerNode for dynamic sound emitters (maglev, waterfall, robots)
+   */
+  createPositionalSource({ refDistance = 4.0, maxDistance = 100.0, rolloffFactor = 1.0 } = {}) {
+    if (!this.isInitialized || !this.ctx) {
+      return {
+        setPosition: () => {},
+        gain: null,
+        panner: null
+      };
+    }
+
+    try {
+      const panner = this.ctx.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.distanceModel = 'inverse';
+      panner.refDistance = refDistance;
+      panner.maxDistance = maxDistance;
+      panner.rolloffFactor = rolloffFactor;
+
+      const sourceGain = this.ctx.createGain();
+      sourceGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      sourceGain.connect(panner);
+      panner.connect(this.masterGain);
+
+      const sourceObj = {
+        panner,
+        gain: sourceGain,
+        setPosition: (x, y, z) => {
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          if (panner.positionX) {
+            panner.positionX.setTargetAtTime(x, t, 0.05);
+            panner.positionY.setTargetAtTime(y, t, 0.05);
+            panner.positionZ.setTargetAtTime(z, t, 0.05);
+          } else if (typeof panner.setPosition === 'function') {
+            panner.setPosition(x, y, z);
+          }
+        }
+      };
+
+      this.positionalSources.push(sourceObj);
+      return sourceObj;
+    } catch (e) {
+      return {
+        setPosition: () => {},
+        gain: null,
+        panner: null
+      };
+    }
+  }
+
+  /**
+   * Procedural FM surface footstep synthesizer
+   * Surfaces: 'asphalt' (crisp crunch), 'metal' (hollow clank), 'grass' (soft rustle), 'water' (splash)
+   */
+  playFootstep(surface = 'asphalt', position = null) {
+    if (!this.isInitialized || this.isMuted || !this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      if (now - this.lastFootstepTime < 0.12) return; // Debounce rapid triggers
+      this.lastFootstepTime = now;
+
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      let targetFreq = 120;
+      let duration = 0.08;
+      let filterFreq = 1800;
+
+      if (surface === 'metal') {
+        osc.type = 'triangle';
+        targetFreq = 340;
+        duration = 0.12;
+        filterFreq = 3200;
+      } else if (surface === 'grass') {
+        osc.type = 'sine';
+        targetFreq = 85;
+        duration = 0.06;
+        filterFreq = 900;
+      } else if (surface === 'water') {
+        osc.type = 'sine';
+        targetFreq = 220;
+        duration = 0.14;
+        filterFreq = 1400;
+      } else {
+        // asphalt
+        osc.type = 'sawtooth';
+        targetFreq = 110;
+        duration = 0.07;
+        filterFreq = 2000;
+      }
+
+      osc.frequency.setValueAtTime(targetFreq * 1.5, now);
+      osc.frequency.exponentialRampToValueAtTime(targetFreq * 0.7, now + duration);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(filterFreq, now);
+      filter.Q.value = 3.5;
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.08, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc.connect(filter);
+      filter.connect(gain);
+
+      if (position && this.createPositionalSource) {
+        const panner = this.ctx.createPanner();
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'inverse';
+        panner.refDistance = 2.0;
+        panner.maxDistance = 50.0;
+        if (panner.positionX) {
+          panner.positionX.setValueAtTime(position.x || 0, now);
+          panner.positionY.setValueAtTime(position.y || 0, now);
+          panner.positionZ.setValueAtTime(position.z || 0, now);
+        } else if (typeof panner.setPosition === 'function') {
+          panner.setPosition(position.x || 0, position.y || 0, position.z || 0);
+        }
+        gain.connect(panner);
+        panner.connect(this.masterGain);
+      } else {
+        gain.connect(this.masterGain);
+      }
+
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    } catch (e) {
+      // Audio synth non-fatal guard
+    }
+  }
+
+  /**
+   * Synthesize Doppler Maglev Transit Whoosh
+   */
+  playMaglevWhoosh(position = null) {
+    if (!this.isInitialized || this.isMuted || !this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'sawtooth';
+      // Doppler downward glide: 340 Hz -> 160 Hz
+      osc.frequency.setValueAtTime(340, now);
+      osc.frequency.exponentialRampToValueAtTime(160, now + 0.6);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1400, now);
+      filter.frequency.exponentialRampToValueAtTime(400, now + 0.6);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.2, now + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.7);
+    } catch (e) {
+      // Guard
+    }
+  }
+
+  update(timelineSeconds, altitude, camera = null) {
     if (!this.isInitialized || this.isMuted) return;
+    if (camera) this.updateListener(camera);
 
     const t = timelineSeconds;
     if (t < 2.5) {

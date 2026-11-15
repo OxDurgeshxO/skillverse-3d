@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createHologramMaterial } from '../shaders/hologramShader.js';
+import { createSubsurfaceMaterial } from '../shaders/subsurfaceShader.js';
 
 export class ExplorerAvatar {
   constructor(scene, targetHeight = 0.38) {
@@ -36,10 +37,8 @@ export class ExplorerAvatar {
       metalness: 0.3
     });
 
-    const skinMat = new THREE.MeshStandardMaterial({
-      color: 0xdeb887,
-      roughness: 0.7
-    });
+    // Realistic Sub-Surface Scattering skin material
+    const skinMat = createSubsurfaceMaterial(0xdeb887, 0xff7b61, 0.55);
 
     // Torso / Jacket
     const torsoGeom = new THREE.BoxGeometry(0.42, 0.55, 0.26);
