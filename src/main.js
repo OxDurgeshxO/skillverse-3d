@@ -19,6 +19,10 @@ import { DirectorWaypointEditor } from './ui/DirectorWaypointEditor.js';
 import { MultiAgentChatterEngine } from './ai/MultiAgentChatterEngine.js';
 import { SoundscapeMixer } from './ui/SoundscapeMixer.js';
 import { ZoneInteractions } from './ui/ZoneInteractions.js';
+import { ClothSimulation } from './physics/ClothSimulation.js';
+import { SkyTrafficEngine } from './world/SkyTrafficEngine.js';
+import { BiomeWildlifeEngine } from './world/BiomeWildlifeEngine.js';
+import { MultiplayerSyncEngine } from './network/MultiplayerSyncEngine.js';
 
 /**
  * Security & Input Validation Helpers
@@ -380,6 +384,9 @@ class SkillverseApp {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       if (this.postProcessing) {
         this.postProcessing.reinit();
+      }
+      if (this.worldManager && typeof this.worldManager.rebindShaders === 'function') {
+        this.worldManager.rebindShaders();
       }
     });
 
@@ -894,18 +901,78 @@ class SkillverseApp {
       });
     }
 
-    // Performance Tier Toggle (60 FPS Performance vs Ultra Cinematic)
+    // Performance Tier Toggle (60 FPS Performance vs Ultra Cinematic with Persistence)
     const btnPerfTier = document.getElementById('btn-perf-tier');
+    if (typeof localStorage !== 'undefined') {
+      const savedTier = localStorage.getItem('skillverse_quality_tier');
+      if (savedTier && this.postProcessing) {
+        this.postProcessing.setQualityTier(savedTier);
+        if (btnPerfTier) {
+          const isPerf = savedTier === 'PERFORMANCE';
+          btnPerfTier.textContent = isPerf ? '⚡ 60 FPS: ON' : '✨ Ultra Cinematic';
+          btnPerfTier.style.color = isPerf ? '#10b981' : '#38bdf8';
+        }
+      }
+    }
     if (btnPerfTier) {
       btnPerfTier.addEventListener('click', () => {
         if (this.postProcessing) {
           const isPerf = this.postProcessing.qualityTier !== 'PERFORMANCE';
           const newTier = isPerf ? 'PERFORMANCE' : 'CINEMATIC';
           this.postProcessing.setQualityTier(newTier);
+          if (typeof localStorage !== 'undefined') {
+            try { localStorage.setItem('skillverse_quality_tier', newTier); } catch (e) {}
+          }
           btnPerfTier.textContent = isPerf ? '⚡ 60 FPS: ON' : '✨ Ultra Cinematic';
           btnPerfTier.style.color = isPerf ? '#10b981' : '#38bdf8';
           this.showToast(isPerf ? 'PERFORMANCE MODE ACTIVE: 60 FPS OPTIMIZED' : 'CINEMATIC ULTRA MODE ACTIVE');
+          this.triggerHaptic([15, 20]);
         }
+      });
+    }
+
+    // Master Volume & Quick Mute Header Controls (Small 4)
+    const btnMasterMute = document.getElementById('btn-master-mute');
+    const masterVolSlider = document.getElementById('master-volume-slider');
+    if (btnMasterMute) {
+      btnMasterMute.addEventListener('click', () => {
+        if (this.audioEngine) {
+          const isMuted = this.audioEngine.toggleMute();
+          btnMasterMute.textContent = isMuted ? '🔇' : '🔊';
+          btnMasterMute.style.color = isMuted ? '#ef4444' : '#38bdf8';
+          this.showToast(isMuted ? 'AUDIO MUTED' : 'AUDIO UNMUTED');
+          this.triggerHaptic([10]);
+        }
+      });
+    }
+    if (masterVolSlider) {
+      masterVolSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (this.audioEngine) {
+          this.audioEngine.setMasterVolume(val);
+          if (btnMasterMute) {
+            btnMasterMute.textContent = val <= 0 ? '🔇' : '🔊';
+            btnMasterMute.style.color = val <= 0 ? '#ef4444' : '#38bdf8';
+          }
+        }
+      });
+    }
+
+    // Cinematic Framing Format & Aspect Ratio Selector (Small 5)
+    const selectAspect = document.getElementById('select-aspect-ratio');
+    if (selectAspect) {
+      selectAspect.addEventListener('change', (e) => {
+        const val = e.target.value;
+        document.body.classList.remove('anamorphic', 'aspect-1-1', 'aspect-9-16');
+        if (val === '2.39:1') {
+          document.body.classList.add('anamorphic');
+        } else if (val === '1:1') {
+          document.body.classList.add('aspect-1-1');
+        } else if (val === '9:16') {
+          document.body.classList.add('aspect-9-16');
+        }
+        this.showToast(`ASPECT RATIO FRAMING: ${val}`);
+        this.triggerHaptic([15]);
       });
     }
 
@@ -1083,12 +1150,18 @@ class SkillverseApp {
     });
   }
 
+  triggerHaptic(pattern = [15]) {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      try { navigator.vibrate(pattern); } catch (e) {}
+    }
+  }
+
   initKeyboardShortcuts() {
     if (typeof window === 'undefined') return;
 
     window.addEventListener('keydown', (e) => {
-      // Ignore if user is typing in input or select
-      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+      // Fix 9: Ignore if user is typing in input, textarea, select, or contenteditable
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable)) {
         return;
       }
 
@@ -1114,7 +1187,11 @@ class SkillverseApp {
         this.setCameraMode('explorer');
         if (btnCinematic && btnOrbit && btnExplorer) this.updateActiveBtn([btnCinematic, btnOrbit, btnExplorer], btnExplorer);
       } else if (e.key === 'm' || e.key === 'M') {
-        document.getElementById('btn-world-menu')?.click();
+        if (e.shiftKey) {
+          document.getElementById('btn-world-menu')?.click();
+        } else {
+          document.getElementById('btn-master-mute')?.click();
+        }
       } else if (e.key === 'f' || e.key === 'F') {
         document.getElementById('btn-festival')?.click();
       } else if (e.key === 'p' || e.key === 'P') {
@@ -1446,6 +1523,17 @@ class SkillverseApp {
       this.chatterEngine = new MultiAgentChatterEngine(this.scene, this.audioEngine);
       this.soundscapeMixer = new SoundscapeMixer(this.audioEngine);
       this.zoneInteractions = new ZoneInteractions(this);
+
+      // Stage 4: Kinetic Simulation - Verlet Cloth Banner & Autonomous Sky Traffic & Biome Wildlife
+      this.clothSimulation = new ClothSimulation({ width: 3.5, height: 6.0 });
+      this.clothSimulation.mesh.position.set(0, 28, 28);
+      if (this.scene) this.scene.add(this.clothSimulation.mesh);
+
+      this.skyTraffic = new SkyTrafficEngine(this.scene);
+      this.biomeWildlife = new BiomeWildlifeEngine(this.scene);
+
+      // Stage 5: Multiplayer Peer Synchronization
+      this.multiplayer = new MultiplayerSyncEngine(this.scene, this.explorer);
     } catch (err) {
       console.warn('[Skillverse] initStageEnhancements non-fatal warning:', err);
     }
@@ -1538,9 +1626,18 @@ class SkillverseApp {
     });
 
     // 4. Update Autonomous Crowd Simulation & High-Density GPU Particles
-    if (this.crowdEngine) this.crowdEngine.update(delta, time);
+    if (this.crowdEngine) this.crowdEngine.update(delta, time, this.explorer?.group?.position);
     if (this.gpuParticles) this.gpuParticles.update(time);
     if (this.physicsWorld) this.physicsWorld.update(delta, time);
+
+    // 4a. Update Verlet Dynamic Cloth Banners & Sky Traffic Corridors & Wildlife
+    if (this.clothSimulation) {
+      const windVec = this.weatherEngine?.getWindVector() || { x: 3.5, y: 0.2, z: 2.0 };
+      this.clothSimulation.update(delta, windVec);
+    }
+    if (this.skyTraffic) this.skyTraffic.update(delta, time);
+    if (this.biomeWildlife) this.biomeWildlife.update(delta, time);
+    if (this.multiplayer) this.multiplayer.update(delta, time);
 
     // 4b. Update Holographic 3D Globe GPS Radar HUD
     if (this.radar) {

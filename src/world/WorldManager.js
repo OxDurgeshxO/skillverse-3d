@@ -285,4 +285,19 @@ export class WorldManager {
       }
     });
   }
+
+  /**
+   * Re-bind custom shader materials after WebGL context restoration (Fix 7)
+   */
+  rebindShaders() {
+    this.scene.traverse((child) => {
+      if (child.isMesh && child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => { if (m.isShaderMaterial) m.needsUpdate = true; });
+        } else if (child.material.isShaderMaterial) {
+          child.material.needsUpdate = true;
+        }
+      }
+    });
+  }
 }

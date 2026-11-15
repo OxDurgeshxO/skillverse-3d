@@ -68,6 +68,20 @@ export class WeatherEngine {
     return this.targetWeather;
   }
 
+  /**
+   * Get dynamic wind velocity vector driving cloth simulation & particles
+   */
+  getWindVector() {
+    if (this.currentWeather === 'RAIN') {
+      return { x: 8.5, y: 0.8, z: 6.0 };
+    } else if (this.currentWeather === 'OVERCAST') {
+      return { x: 5.0, y: 0.3, z: 3.5 };
+    } else if (this.currentWeather === 'TWILIGHT') {
+      return { x: 2.0, y: 0.1, z: 1.5 };
+    }
+    return { x: 3.2, y: 0.2, z: 2.0 }; // CLEAR default
+  }
+
   update(delta, time, camera) {
     // Smooth transition between weather modes
     if (this.currentWeather !== this.targetWeather) {

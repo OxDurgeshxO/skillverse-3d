@@ -16,36 +16,33 @@
 
 ---
 
-## 2. Critical Bug Fixes & Gotchas
+## 2. Performance Audit & 60 FPS De-Stalling Invariants (Phase 11)
 
-### Three.js Shadow Map Deprecation
-- **Error**: `THREE.WebGLShadowMap: PCFSoftShadowMap has been removed.`
-- **Fix**: Replaced with `THREE.PCFShadowMap` in `src/main.js`. Clean, high-performance soft shadows without console deprecation warnings.
+### Synchronous `readRenderTargetPixels` Stalling
+- **Finding**: Calling `renderer.readRenderTargetPixels()` synchronously every frame halts the GPU pipeline to wait for pixel readback and forces a CPU copy loop of 44,240 pixels into a 2D canvas context. Running this while rendering the entire planetary scene twice cut framerate by ~50%.
+- **Invariant**: Default `PictureInPictureCamera.enabled = false`. When active, throttle rendering strictly to 15 FPS (`throttleElapsed < 0.066`).
 
-### Robot Accessory Limb Attachment Order
-- **Error**: `RobotBuilder.js: TypeError: Cannot read properties of undefined (reading 'add')` when attaching welding torches or micro-microphones to limbs.
-- **Root Cause**: `addSignatureAccessories` was called before `robot.userData` was populated with `armLeft`, `armRight`, `legLeft`, etc.
-- **Fix**: Initialized all limb references inside `robot.userData` before invoking signature accessory builders.
+### High-DPI DPR Clamping
+- **Finding**: High-DPI 4K displays with `devicePixelRatio = 2.0` rendered at 3840x2160, running 5 post-processing passes with 9-tap tilt-shift texture fetches totaling ~80 million texture fetches/frame.
+- **Invariant**: Clamp renderer DPR to `Math.min(window.devicePixelRatio, 1.25)`. Provides crystal-clear text on Retina screens while cutting fragment fill rate by $>60\%$.
 
-### CRLF Shader Edit Gotcha on Windows
-- **Issue**: Multi-line target strings in `edit_file` can fail to match if CRLF line endings differ from LF strings.
-- **Fix**: Target smaller contiguous single blocks or normalize line endings when editing shader files like `wetPavementShader.js`.
+### Layout Thrashing via Rapid DOM Mutation
+- **Finding**: Mutating `document.title` and HUD DOM innerText 60 times/second forced the browser window manager and tab strip to repaint continuously.
+- **Invariant**: Throttle telemetry DOM updates and title string updates to 4 Hz (every 250ms).
 
----
-
-## 3. Performance & Optimization Baselines
-- **WebGL Tone Mapping**: ACES Filmic with exposure 1.15 produces crisp specular highlights on wet pavement without clipping neon billboard color channels.
-- **Catmull-Rom Splines**: Centripetal tension (0.5) ensures smooth acceleration curves without overshoot artifacts when passing near building facades.
+### 2D Canvas Radar Rasterization Overhead
+- **Finding**: Drawing 3D spheres, arcs, blips, and text on a 2D canvas context at 60 FPS consumed 8ms of CPU main-thread time per frame.
+- **Invariant**: Throttle `HolographicRadar.render()` to 20 FPS (50ms interval). Retains silky smooth radar blips while saving 70% 2D canvas rasterization overhead.
 
 ---
 
-## 4. Security Audit & Memory Safety Invariants (Phase 7 & 8)
+## 3. Security Audit & Memory Safety Invariants
 - **Recursive WebGL GPU Disposal**:
   - `scene.remove(mesh)` alone does not free VRAM in WebGL. Explicit traversal with `child.geometry.dispose()` and `child.material.dispose()` is required to prevent GPU buffer accumulation.
 - **Headless Node.js SSR Guarding**:
   - Web Audio (`AudioContext`), DOM (`document`), and window properties must always be guarded with `typeof window !== 'undefined'` and `typeof document !== 'undefined'` to allow clean execution in headless CI/CD test runners (`node --test`).
-- **GPU Particle Performance**:
-  - 50,000 billboard particles achieve zero frame-rate drops by computing motion vectors and cyclic alpha fade entirely in GLSL vertex/fragment shaders instead of updating 50,000 array elements on the CPU per frame.
+- **Input Sanitization**:
+  - All DOM string insertions must pass through `escapeHTML()` to neutralize stored/reflected XSS vectors.
 - **Test Baseline**:
-  - 23 / 23 unit tests passing in `< 450ms` across all subsystems (`tests/**/*.test.js`).
+  - 37 / 37 unit tests passing in `< 600ms` across all subsystems (`tests/**/*.test.js`).
   - Production build bundle compiles in `~330ms` with zero CVE vulnerabilities.

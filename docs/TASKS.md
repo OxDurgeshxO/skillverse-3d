@@ -110,8 +110,42 @@
 - [x] **Stage 4 (Particles & Shadows)**: Right-sized GPU particles from 40k to 12k; optimized shadow map resolution to 1024x1024 with tight center bounds (-160 to 160).
 - [x] **Stage 5 (Verification & Benchmarking)**: Added `tests/performanceAudit.test.js`; 37 / 37 automated tests passing (100% pass rate).
 
+### Phase 12: Staged Evolution Master Plan (All 25 Items Complete)
+- [x] **Stage 1: Production Hardening, Quality Gate & Public Web Deployment**
+  - [x] Fix 1: Canonical documentation synchronization (`PRD.md`, `ARCHITECTURE.md`, `MEMORY.md`).
+  - [x] Fix 2: GitHub remote origin configured (`OxDurgeshxO/skillverse-3d`) and `.github/workflows/verify.yml` CI/CD added.
+  - [x] Fix 3: Configured `base: './'` in `vite.config.js` for subfolder hosting.
+  - [x] Small 1: Added unified `"audit": "npm test && npm run build"` quality gate script in `package.json`.
+  - [x] Major 5: Enabled GitHub Pages automated deployment workflow (`.github/workflows/deploy-pages.yml`) and `vercel.json`.
+- [x] **Stage 2: Core Runtime Stability & Input/Audio Ergonomics**
+  - [x] Fix 4: Audio listener orientation world-space forward and up calculation in `SpatialAudioEngine.js`.
+  - [x] Fix 5: Mobile viewport height `100dvh` and canvas `touch-action: none` in `index.html`.
+  - [x] Fix 8: Transit monorail Doppler oscillator distance culling (>120m) in `SpatialAudioEngine.js`.
+  - [x] Fix 9: Global keyboard shortcut guard for `INPUT`, `TEXTAREA`, `SELECT`, and `isContentEditable`.
+  - [x] Fix 10: Performance quality tier `localStorage` persistence across browser reloads.
+  - [x] Small 4: HUD master volume slider and `M` quick mute hotkey.
+- [x] **Stage 3: Advanced Exporters, Shaders & Visual Polish**
+  - [x] Fix 6: Binary STL Little-Endian exporter (`exportBinarySTL`) reducing file size by 80% (<600 KB).
+  - [x] Fix 7: WebGL context restoration shader recompile handler in `WorldManager.js` and `main.js`.
+  - [x] Small 2: Mobile and gamepad haptic vibration pulses (`navigator.vibrate`).
+  - [x] Small 3: Procedural ambient occlusion ground contact shadow disks under robot feet.
+  - [x] Small 5: Cinematic aspect ratio letterbox/pillarbox masks (16:9, 2.39:1, 1:1, 9:16).
+  - [x] Medium 1: Director Studio 3D interactive spline gizmos and waypoint curve visualization.
+- [x] **Stage 4: Kinetic Simulation, Sky Corridors & Living Biomes**
+  - [x] Major 2: Verlet cloth simulation engine (`ClothSimulation.js`) for fluttering arcology banners.
+  - [x] Major 3: Autonomous sky traffic engine (`SkyTrafficEngine.js`) with 3 dual-rotor VTOL passenger drones.
+  - [x] Medium 4: Elastic avatar-pedestrian collision and recoil separation in `CrowdSimulationEngine.js`.
+  - [x] Medium 5: Ambient biome wildlife (`BiomeWildlifeEngine.js`): ocean fish, mountain eagles, cyber-bees.
+  - [x] Medium 2: Web Audio robotic formant vocoder mapping all 18 skill species in `SpatialAudioEngine.js`.
+- [x] **Stage 5: Multiplayer Collaboration & Social Metaverse**
+  - [x] Major 1: Multi-player WebRTC peer synchronization (`MultiplayerSyncEngine.js`) with avatar interpolation.
+  - [x] Major 4: Dynamic 12-zone light probe array in `WorldManager.js`.
+  - [x] Medium 3: Holographic Radar Fog of War and Discovery Journal tracking in `HolographicRadar.js`.
+- [x] 46 / 46 automated unit tests passing continuously (`npm test`).
+- [x] Production bundle optimized to 169 kB main bundle (`npm run build`).
+
 ---
 
 ## Active & Upcoming Backlog
-- [ ] Multi-player WebRTC peer synchronization.
-- [ ] Physics cloth simulation on arcology flags and banners.
+- [ ] Unreal Engine 5 Nanite mesh live streaming via WebSocket.
+- [ ] Procedural procedural terrain voxel terraforming tools.

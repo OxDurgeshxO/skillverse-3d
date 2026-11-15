@@ -19,10 +19,13 @@
     body, html {
       width: 100%;
       height: 100%;
+      height: 100dvh;
       overflow: hidden;
       background-color: #030712;
       font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
       color: #f3f4f6;
+      touch-action: none;
+      -webkit-touch-callout: none;
     }
     #webgl-container {
       position: absolute;
@@ -30,10 +33,12 @@
       left: 0;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       z-index: 1;
+      touch-action: none;
     }
 
-    /* Cinematic 2.39:1 / 16:9 Letterbox Bars */
+    /* Cinematic Letterbox & Pillarbox Bars */
     .letterbox-bar {
       position: absolute;
       left: 0;
@@ -48,6 +53,26 @@
     body.anamorphic .letterbox-top,
     body.anamorphic .letterbox-bottom {
       height: 7.5vh;
+    }
+    .letterbox-pillar {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      background: #000000;
+      z-index: 20;
+      pointer-events: none;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      width: 0px;
+    }
+    .pillar-left { left: 0; border-right: 1px solid rgba(255,255,255,0.06); }
+    .pillar-right { right: 0; border-left: 1px solid rgba(255,255,255,0.06); }
+    body.aspect-1-1 .pillar-left,
+    body.aspect-1-1 .pillar-right {
+      width: max(0px, calc((100vw - 100vh) / 2));
+    }
+    body.aspect-9-16 .pillar-left,
+    body.aspect-9-16 .pillar-right {
+      width: max(0px, calc((100vw - (100vh * 9 / 16)) / 2));
     }
 
     /* HUD Layer */
@@ -953,9 +978,11 @@
 <body>
   <div id="webgl-container"></div>
 
-  <!-- Cinematic Letterbox Bars (2.39:1 Anamorphic) -->
+  <!-- Cinematic Letterbox & Pillarbox Bars -->
   <div class="letterbox-bar letterbox-top"></div>
   <div class="letterbox-bar letterbox-bottom"></div>
+  <div class="letterbox-pillar pillar-left"></div>
+  <div class="letterbox-pillar pillar-right"></div>
 
   <!-- HUD Telemetry & Sequencer Interface -->
   <div id="hud-overlay">
@@ -989,6 +1016,18 @@
         <div class="telemetry-item">
           <span class="telemetry-label">FPS</span>
           <span class="telemetry-value" id="hud-fps">60 FPS</span>
+        </div>
+        <div class="telemetry-item" style="display: flex; align-items: center; gap: 4px;">
+          <button id="btn-master-mute" title="Toggle Mute (Hotkey: M)" style="background: none; border: none; color: #38bdf8; cursor: pointer; font-size: 13px; line-height: 1; padding: 2px;">🔊</button>
+          <input type="range" id="master-volume-slider" min="0" max="1" step="0.05" value="0.4" style="width: 48px; height: 4px; accent-color: #38bdf8; cursor: pointer;" title="Master Volume" />
+        </div>
+        <div class="telemetry-item">
+          <select id="select-aspect-ratio" style="background: rgba(15,23,42,0.85); border: 1px solid rgba(56,189,248,0.35); color: #7dd3fc; font-size: 10px; font-family: 'JetBrains Mono', monospace; border-radius: 4px; padding: 2px 4px; outline: none; cursor: pointer;" title="Aspect Ratio Mask">
+            <option value="16:9">16:9 Wide</option>
+            <option value="2.39:1">2.39:1 Film</option>
+            <option value="1:1">1:1 Square</option>
+            <option value="9:16">9:16 Reel</option>
+          </select>
         </div>
       </div>
     </header>

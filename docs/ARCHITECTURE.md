@@ -5,127 +5,61 @@
 ```
 SkillverseApp (src/main.js)
 ├── SkillverseCoordinator (src/core/SkillverseCoordinator.js)  [Event Bus & State Manager]
-├── THREE.WebGLRenderer (ACESFilmic, PCFShadowMap, ToneMapping 1.15)
+├── PerformanceTimer (src/core/PerformanceTimer.js)            [Monotonic Drift-Free Delta]
+├── THREE.WebGLRenderer (ACESFilmic, PCFShadowMap, DPR 1.25 clamp)
 ├── CameraSequencer (src/cinematics/CameraSequencer.js)        [Fixed 24mm Catmull-Rom Spline]
-├── SpatialAudioEngine (src/audio/SpatialAudioEngine.js)       [Multi-Formant Synthesis & Ambience]
+├── DirectorWaypointEditor (src/cinematics/DirectorWaypointEditor.js) [3D Spline Designer & Gizmos]
+├── PictureInPictureCamera (src/cinematics/PictureInPictureCamera.js) [15 FPS Multi-Perspective HUD]
+├── SpatialAudioEngine (src/audio/SpatialAudioEngine.js)       [HRTF Spatialization & Vocoder]
+├── SoundscapeMixer (src/audio/SoundscapeMixer.js)             [6-Channel Audio UI Console]
+├── WeatherEngine (src/world/WeatherEngine.js)                 [Dynamic Rain, Clouds & Wind Vectors]
+├── TransitNetwork (src/world/TransitNetwork.js)               [6 Planetary Stations & Monorail Loop]
+├── SkyTrafficEngine (src/world/SkyTrafficEngine.js)           [Autonomous VTOL Air-Taxis]
+├── ClothSimulation (src/physics/ClothSimulation.js)           [Verlet Dynamic Arcology Banners]
+├── PhysicsWorld (src/physics/PhysicsWorld.js)                 [Ocean Buoyancy & Hydrodynamics]
+├── MultiplayerSyncEngine (src/network/MultiplayerSyncEngine.js) [WebRTC P2P DataChannel Mesh]
 ├── WorldManager (src/world/WorldManager.js)
 │   ├── PlanetTerrain (src/world/PlanetTerrain.js)             [R=800m Curvature, Ocean Plane]
-│   ├── TransitNetwork (src/world/TransitNetwork.js)           [Maglev Station, Planetary Loop, Cars]
-│   ├── VolumetricCloudShader (src/shaders/volumetricCloud.js) [Perlin Ray-Marching Deck]
-│   └── 12 Living Zones (src/world/zones/*.js)
-│       ├── TechCity.js                                        [Wet Pavement SSR, Glass Towers]
-│       ├── AIResearchValley.js                                [Geodesic Domes, Neural Dome]
-│       ├── CreativeArtDistrict.js                             [Mobius Sculpture, Neon Stage]
-│       ├── MedicalCareCity.js                                 [Hospital Arc, Emerald Cross]
-│       ├── EngineeringHarbor.js                               [Container Docks, Cranes, Ships]
-│       ├── GreenAgricultureFields.js                          [Aeroponic Towers, Solar Arrays]
-│       ├── AdventureMountains.js                              [Granite Peaks, Suspension Bridge]
-│       ├── OceanExplorationCoast.js                           [Offshore Rig, Robot Submarine]
-│       ├── SpaceLaunchBase.js                                 [Rocket Pad, Gantry, Venting Steam]
-│       ├── AncientHistoryRuins.js                             [Sandstone Temple, Laser Grid]
-│       ├── SportsArena.js                                     [Stadium Dome, Kinetic Tracks]
-│       └── GlobalLearningUniversity.js                        [Knowledge Spire, Hologram Globe]
+│   ├── 12 Living Zones (src/world/zones/*.js)
+│   └── VolumetricCloudShader (src/shaders/volumetricCloud.js)
 ├── Entity Layer
 │   ├── ExplorerAvatar (src/entities/ExplorerAvatar.js)        [38cm Miniature Avatar & Holo Tablet]
-│   ├── RobotBuilder (src/entities/RobotBuilder.js)            [Procedural 18 Humanoid Species]
-│   └── STL3DPrintExporter (src/exporters/STL3DPrintExporter)  [ASCII Manifold STL Generator]
-└── Production Pipeline
-    ├── skillverse_generator.py                                [Generates JSON scene manifest]
-    ├── ue5_auto_importer.py                                   [Builds UE5 Master Level Sequence]
-    └── UE5_PRODUCTION_BIBLE.md & AI_VIDEO_PROMPT_MATRIX.md   [Production Specs & Prompt Tokens]
+│   ├── InverseKinematicsSolver (src/entities/InverseKinematicsSolver.js) [Two-Bone Foot Planting]
+│   ├── RobotBuilder (src/entities/RobotBuilder.js)            [18 Procedural Species & SSS Shaders]
+│   ├── CrowdSimulationEngine (src/world/CrowdSimulationEngine.js) [32 Autonomous Pedestrians]
+│   └── MultiAgentChatterEngine (src/entities/MultiAgentChatterEngine.js) [Proximity AI & Quests]
+├── UI & HUD
+│   ├── HolographicRadar (src/ui/HolographicRadar.js)          [20 FPS 3D GPS & Fog of War]
+│   ├── RobotCustomizerModal (src/ui/RobotCustomizerModal.js)  [360° Turntable PBR Builder]
+│   └── VideoRecorderExporter (src/exporters/VideoRecorderExporter.js) [4K LUTs & 60 FPS Video]
+└── Exporters & Network
+    ├── STL3DPrintExporter (src/exporters/STL3DPrintExporter.js) [ASCII & Binary Little-Endian STL]
+    └── skillverse_generator.py & ue5_auto_importer.py         [Offline UE5 Master Sequence]
 ```
 
 ## 2. Master Lifecycle & Data Flow
 
 Every animation frame:
-1. `delta` and `time` are computed via Three.js clock.
-2. In `cinematic` mode:
-   - `CameraSequencer.update(delta)` evaluates spline points $\mathbf{P}(t)$ and targets $\mathbf{T}(t)$ at current time $t \in [0.0, 10.0]$.
-   - Camera position and look-at are updated with fixed $73.74^\circ$ FOV.
-   - UI HUD slider and timecode readouts update.
-3. `SkillverseCoordinator.update(delta, time)` broadcasts tick events to subscribed subsystems.
-4. `WorldManager.update(delta, time, sequencerTime)`:
-   - Updates terrain wave perturbations.
-   - Updates `TransitNetwork`: autonomous ground cars yield at crosswalk ($z = 55\text{m}$), and 3-car maglev train smoothly decelerates into Maglev Central Station platform ($z = 70\text{m}$) from $t = 6.0\text{s} \to 10.0\text{s}$.
-   - Animates high-atmosphere flocking birds ($y = 520\text{m}$) and clouds ($y = 280\text{m}$).
-   - Updates all active zones and wet pavement shader uniforms (`uTime`, `uSunColor`, `uSunDirection`).
-5. Character updates:
-   - `ExplorerAvatar.update`: arm and leg walk cadence ($3.6\text{ rad/s}$).
-   - `RobotBuilder.animateRobot`: 18 skill robots execute walking cadence ($3.6\text{ rad/s}$) or idle work gestures (typing on hologram keyboard, pulsing chest soundwave equalizer, wielding welding torch).
-6. Audio engine updates:
-   - Evaluates camera altitude and distance to active zones, cross-fading stratospheric wind, urban hum, and electronic chirps.
-7. Frame rendered via `renderer.render(scene, camera)`.
-
-## 3. Planetary Curvature Formula
-All global terrain and zone foundations adhere to the spherical drop equation:
-$$\Delta y(x, z) = -\frac{x^2 + z^2}{2R}, \quad R = 800.0\text{ m}$$
-This creates a realistic miniature Earth horizon visible during the 0–4s stratospheric descent.
-
-## 4. Shaders & Physical Materials
-- **Wet Pavement Shader** (`src/shaders/wetPavementShader.js`):
-  - Base asphalt noise + smoothstep puddle mask.
-  - Fresnel reflection ($0.04 + 0.96(1 - \mathbf{N}\cdot\mathbf{V})^5$).
-  - Cool teal ambient shadows (`#02161e`).
-  - Warm amber ($3200\text{K}$, `#ffaa52`) Planckian specular sun reflection.
-- **Volumetric Cloud Shader** (`src/shaders/volumetricCloudShader.js`):
-  - Multi-octave 3D Perlin ray-marching with sunset absorption and silver-lining scattering.
-- **Hologram Shader** (`src/shaders/hologramShader.js`):
-  - Additive blending, scanlines, Fresnel edge glow, and temporal flicker.
-
-## 5. Post-Processing & Optics Pipeline
-- **Post-Processing Pipeline** (`src/shaders/PostProcessingPipeline.js`):
-  - Three.js `EffectComposer` chain: `RenderPass` -> `UnrealBloomPass` (threshold: 0.82, strength: 0.55, radius: 0.35) -> `ShaderPass(TiltShiftShader)` -> `OutputPass`.
-  - Tilt-shift lens pass simulates macro miniature depth-of-field with sharp focus on explorer/robots and smooth bokeh blur on skyline towers.
-- **Sub-Surface Scattering (SSS)** (`src/shaders/subsurfaceShader.js`):
-  - Simulates subsurface light transmission for humanoid skin and translucent polycarbonate robot visors.
-
-## 6. Spatial Audio & Acoustic Telemetry
-- **Web Audio 3D Positional Engine** (`src/audio/SpatialAudioEngine.js`):
-  - HRTF 3D `AudioListener` position & orientation dynamically synchronized with Three.js camera.
-  - Inverse distance attenuation `PannerNode` attached to transit trains, waterfalls, and companion robots.
-  - Procedural FM surface footstep synthesizer modulated by terrain material (asphalt, metal, grass, water).
-  - Doppler frequency glide synthesizer for passing maglev trains.
-
-## 7. Inhabitant Intelligence & Kinematics
-- **Analytic Two-Bone IK** (`src/entities/InverseKinematicsSolver.js`):
-  - Law of Cosines trigonometric solver for robot legs maintaining ground contact across slopes and curbs without hovering or sinking.
-- **Autonomous Crowd Pathfinding** (`src/world/CrowdSimulationEngine.js`):
-  - 32 miniature citizens with reciprocal velocity avoidance (RVO) vector steering and 3-phase crosswalk traffic signal state machine (Green, Yellow, Red).
-- **3D Robot Builder Customizer** (`src/ui/RobotCustomizerModal.js`):
-  - 360° auto-turntable modal allowing players to configure PBR armor, LED sensors, and signature rigs, then deploy live into the planet.
-
-## 8. Simulation & VFX Engine
-- **High-Density GPU Particles** (`src/shaders/GpuParticleSystem.js`):
-  - 50,000 billboard particles computed entirely on GPU across 4 emitter channels (steam, welding sparks, waterfall mist, quantum dust).
-- **Rigid-Body & Ocean Buoyancy** (`src/physics/PhysicsWorld.js`):
-  - Archimedes buoyant force and hydrodynamic pitch/roll torque calculated from procedural ocean wave gradients.
-- **Multimodal Voice Agent Bridge** (`src/ai/RobotVoiceAgentBridge.js`):
-  - Web Speech API speech-to-text bridge connecting to robot knowledge reasoning and multi-formant robotic formant speech synthesis.
-
-## 9. Director Studio & Navigation HUD
-- **3D Holographic GPS Radar** (`src/ui/HolographicRadar.js`):
-  - Orthographic spherical projection rendering live explorer position, companion robot blips, and zone anchors.
-- **Picture-in-Picture Multi-Cam** (`src/cinematics/PictureInPictureCamera.js`):
-  - Off-screen `WebGLRenderTarget` rendering selectable secondary feeds (Scout Drone FPV, Maglev front cab, Launch tower).
-- **4K Photo Studio & Video Exporter** (`src/exporters/VideoRecorderExporter.js`):
-  - Canvas `.captureStream(60)` pipeline to `MediaRecorder` exporting high-bitrate `.webm`/`.mp4` clips and 4K PNG snapshots.
-
-## 10. Next-Gen Multi-Agent Systems & Optics Evolution
-- **Procedural Weather Engine** (`src/world/WeatherEngine.js`):
-  - Procedural atmospheric state machine: `CLEAR`, `OVERCAST`, `RAIN`, `TWILIGHT`.
-  - 5,000 volumetric rain particle streaks dynamically anchored around active camera with wind gust drift.
-  - Coupled with `LensCondensationShader` micro-droplet optical refraction on the 24mm camera lens.
-- **4K Cinematic LUTs Color Grading** (`src/shaders/PostProcessingPipeline.js`):
-  - Calibrated cinematic tone matrices: `CYBERPUNK`, `GOLDEN_HOUR` (3200K), `MATRIX_TEAL`, `MOONLIGHT_NOIR`, and `VINTAGE_TECHNICOLOR`.
-- **Director Waypoint Editor** (`src/ui/DirectorWaypointEditor.js`):
-  - Interactive spline trajectory designer supporting focal lengths (18mm, 24mm, 35mm, 50mm, 85mm), duration curves, and JSON export/import.
-- **Multi-Agent Inhabitant AI Chatter & Skill Quest Log** (`src/ai/MultiAgentChatterEngine.js`):
-  - Evaluates inter-robot proximity ($d < 2.5\text{m}$), triggers emergent domain dialogue with 3D billboard speech bubbles, modulates facial emotion LEDs (`curious`, `happy`, `focused`, `alert`, `sleepy`), and maintains 4 interactive planetary quests.
-- **6-Station Planetary Maglev Transit Network** (`src/world/TransitNetwork.js`):
-  - Continuous Catmull-Rom guide rail connecting 6 passenger depots (Tech City Central, Harbor, Space Launch, University, Agriculture, Art District) with passenger cab observation mode.
-- **Interactive Soundscape Equalizer Mixer** (`src/ui/SoundscapeMixer.js`):
-  - 6-channel acoustic mixer controlling independent gains for Wind, City Hum, Transit, Waterfalls, Robot Vocals, and Synth Ambient.
-- **Zone Micro-Interactions** (`src/ui/ZoneInteractions.js`):
-  - Tech City syntax terminal mini-puzzle, Sports Arena 100m kinetic sprint stopwatch, and Art District virtual mural laser spray paint.
-- **WebXR 6-DoF Parabolic Teleport & Wrist Smartwatch HUD**:
-  - Immersive VR controller raycasting with glowing terrain landing reticle and left-wrist holographic telemetry smartwatch.
+1. `delta` and `time` are computed via monotonic `PerformanceTimer` (clamped to max $0.1\text{s}$ to prevent physics explosion after tab defocus).
+2. Camera state updated:
+   - In `cinematic` mode: `CameraSequencer.update(delta)` evaluates spline points $\mathbf{P}(t)$ and targets $\mathbf{T}(t)$ with locked $73.74^\circ$ FOV.
+   - In `street` mode: First-person camera locked to avatar eye position ($y = 0.52\text{m}$).
+   - In `director` mode: `DirectorWaypointEditor` evaluates customized spline and renders visual 3D node gizmos.
+3. World & Physics:
+   - `WeatherEngine.update(delta)` updates rain particles, wind vectors, and sends `uRainIntensity` to `PostProcessingPipeline`.
+   - `ClothSimulation.update(delta, windVector)` updates Verlet mass-spring nodes for arcology banners.
+   - `SkyTrafficEngine.update(delta)` drives autonomous VTOL air-taxis along elevated sky corridors.
+   - `TransitNetwork.update(delta, time, sequencerTime)` drives planetary monorail trains across 6 stations with Doppler spatial audio.
+   - `PhysicsWorld.update(delta)` calculates hydrodynamic buoyancy and pitch/roll torque for maritime craft.
+4. Characters & AI:
+   - `ExplorerAvatar.update`: arm/leg walk cadence, IK foot planting, and footstep audio triggers.
+   - `CrowdSimulationEngine.update`: 32 pedestrians with crosswalk obedience and elastic collision separation.
+   - `MultiAgentChatterEngine.update`: Proximity evaluation between robots; triggers speech bubbles and Quest progress.
+   - `MultiplayerSyncEngine.update`: Broadcasts local explorer telemetry and interpolates remote peer avatars.
+5. Optics & Post-Processing:
+   - `PostProcessingPipeline.render(scene, camera)`:
+     - In `PERFORMANCE` tier: direct WebGL render with bloom.
+     - In `BALANCED` / `CINEMATIC` tier: EffectComposer with UnrealBloom, Tilt-Shift Bokeh, and dynamic rain lens condensation shader.
+   - Secondary `PictureInPictureCamera.render()` throttled to 15 FPS when enabled.
+   - `HolographicRadar.render()` throttled to 20 FPS (50ms interval).
+   - DOM and browser title telemetry throttled to 4 Hz (250ms).

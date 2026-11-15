@@ -11,13 +11,20 @@ export class HolographicRadar {
     this.rotationAngle = 0;
     this.blips = [];
     this.explorerPos = { x: 0, y: 0, z: 50 };
+    this.discoveredZones = new Set(['Tech City']);
     this.zones = [
       { name: 'Tech City', x: 0, z: 20, color: '#38bdf8' },
       { name: 'AI Valley', x: -240, z: -160, color: '#c084fc' },
       { name: 'Harbor', x: 240, z: -40, color: '#34d399' },
       { name: 'Space Base', x: 420, z: -260, color: '#fbbf24' },
       { name: 'Mountains', x: -360, z: -260, color: '#f87171' },
-      { name: 'Art District', x: -120, z: 120, color: '#ec4899' }
+      { name: 'Art District', x: -120, z: 120, color: '#ec4899' },
+      { name: 'Medical City', x: 120, z: 160, color: '#10b981' },
+      { name: 'Agriculture', x: -160, z: -220, color: '#eab308' },
+      { name: 'Ocean Coast', x: 220, z: -120, color: '#06b6d4' },
+      { name: 'Ancient Ruins', x: -80, z: 320, color: '#d97706' },
+      { name: 'Sports Arena', x: 300, z: 180, color: '#f43f5e' },
+      { name: 'University', x: -40, z: -320, color: '#8b5cf6' }
     ];
 
     this.canvas = null;
@@ -58,6 +65,15 @@ export class HolographicRadar {
     this.rotationAngle += delta * 0.35;
     if (explorerPos) {
       this.explorerPos = { x: explorerPos.x, y: explorerPos.y || 0, z: explorerPos.z };
+
+      // Medium 3: Fog of War zone discovery check (within 90m discovery radius)
+      this.zones.forEach(z => {
+        const dx = z.x - this.explorerPos.x;
+        const dz = z.z - this.explorerPos.z;
+        if (dx * dx + dz * dz < 8100) { // 90m
+          this.discoveredZones.add(z.name);
+        }
+      });
     }
 
     // Throttle 2D canvas radar rasterization to 20 FPS (every 50ms) saving 70% 2D context CPU time
@@ -73,6 +89,14 @@ export class HolographicRadar {
     }));
 
     this.render();
+  }
+
+  getDiscoveryProgress() {
+    return {
+      discovered: this.discoveredZones.size,
+      total: this.zones.length,
+      percentage: Math.round((this.discoveredZones.size / this.zones.length) * 100)
+    };
   }
 
   project3D(x, y, z) {
@@ -142,14 +166,21 @@ export class HolographicRadar {
       ctx.stroke();
     }
 
-    // 4. Draw Zone Anchors
+    // 4. Draw Zone Anchors with Fog of War Distinction (Medium 3)
     this.zones.forEach(z => {
       const p = this.project3D(z.x, 20, z.z);
       if (p.visible) {
-        ctx.fillStyle = z.color;
+        const isDiscovered = this.discoveredZones.has(z.name);
+        ctx.fillStyle = isDiscovered ? z.color : 'rgba(100, 116, 139, 0.45)';
         ctx.beginPath();
-        ctx.arc(p.screenX, p.screenY, 2.5, 0, Math.PI * 2);
+        ctx.arc(p.screenX, p.screenY, isDiscovered ? 2.8 : 1.6, 0, Math.PI * 2);
         ctx.fill();
+
+        if (isDiscovered) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
       }
     });
 

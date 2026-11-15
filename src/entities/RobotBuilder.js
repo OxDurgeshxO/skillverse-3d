@@ -436,6 +436,20 @@ export class RobotBuilder {
     robot.add(badge);
     robot.userData.badge = badge;
 
+    // Small 3: Ambient Occlusion Ground Contact Shadow Disk
+    const shadowGeo = new THREE.PlaneGeometry(2.4, 2.4);
+    const shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x010408,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false
+    });
+    const contactShadow = new THREE.Mesh(shadowGeo, shadowMat);
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.position.y = 0.02;
+    robot.add(contactShadow);
+    robot.userData.contactShadow = contactShadow;
+
     // Scale down from nominal builder size (height ~5.2 units) to exact target height (0.25m - 0.35m)
     const currentHeight = 5.2;
     const scaleFactor = targetHeight / currentHeight;

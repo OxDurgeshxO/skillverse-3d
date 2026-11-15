@@ -92,4 +92,48 @@ export class DirectorWaypointEditor {
     const focal = this.waypoints[segIdx].focal || 24;
     return { pos, target, focal };
   }
+
+  /**
+   * 3D Visual Spline Gizmos (Medium 1)
+   * Renders in-scene 3D waypoint node markers and trajectory spline curve
+   */
+  createGizmos(scene) {
+    if (!scene) return null;
+    if (this.gizmoGroup) {
+      scene.remove(this.gizmoGroup);
+    }
+    this.gizmoGroup = new THREE.Group();
+    this.gizmoGroup.name = 'director_spline_gizmos';
+
+    if (this.spline) {
+      const curvePoints = this.spline.getPoints(60);
+      const curveGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+      const curveMat = new THREE.LineBasicMaterial({ color: 0x38bdf8 });
+      const curveLine = new THREE.Line(curveGeo, curveMat);
+      this.gizmoGroup.add(curveLine);
+    }
+
+    const sphereGeo = new THREE.SphereGeometry(1.2, 16, 16);
+    this.waypoints.forEach((wp, idx) => {
+      const mat = new THREE.MeshBasicMaterial({
+        color: idx === 0 ? 0x10b981 : idx === this.waypoints.length - 1 ? 0xf43f5e : 0x00f0ff,
+        wireframe: true
+      });
+      const marker = new THREE.Mesh(sphereGeo, mat);
+      marker.position.set(...wp.pos);
+      marker.userData = { waypointId: wp.id, index: idx };
+      this.gizmoGroup.add(marker);
+    });
+
+    scene.add(this.gizmoGroup);
+    return this.gizmoGroup;
+  }
+
+  toggleGizmos(scene, visible = true) {
+    if (this.gizmoGroup) {
+      this.gizmoGroup.visible = visible;
+    } else if (visible && scene) {
+      this.createGizmos(scene);
+    }
+  }
 }

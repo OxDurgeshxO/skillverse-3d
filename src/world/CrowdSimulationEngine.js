@@ -84,7 +84,7 @@ export class CrowdSimulationEngine {
     }
   }
 
-  update(delta, time) {
+  update(delta, time, playerPosition = null) {
     // 1. Crosswalk Traffic Light State Machine
     // 12s Green, 3s Yellow, 9s Red
     this.crosswalkTimer = (this.crosswalkTimer + delta) % 24.0;
@@ -99,9 +99,26 @@ export class CrowdSimulationEngine {
     const crosswalkZ = 55.0;
     const stopDistance = 1.8;
 
-    // 2. Update each agent with steering & collision avoidance
+    // 2. Update each agent with steering, elastic collision & separation
     for (let i = 0; i < this.agents.length; i++) {
       const a = this.agents[i];
+
+      // Medium 4: Inhabitant & Player Elastic Collision Response
+      if (playerPosition) {
+        const dx = a.x - playerPosition.x;
+        const dz = a.z - playerPosition.z;
+        const distSq = dx * dx + dz * dz;
+        const minPlayerDist = 0.55;
+        if (distSq < minPlayerDist * minPlayerDist && distSq > 0.0001) {
+          const dist = Math.sqrt(distSq);
+          const pushForce = (minPlayerDist - dist) * 1.5;
+          a.x += (dx / dist) * pushForce * delta * 5.0;
+          a.z += (dz / dist) * pushForce * delta * 5.0;
+          a.mesh.rotation.z = (dx / dist) * 0.18; // Recoil lean
+        } else {
+          a.mesh.rotation.z = THREE.MathUtils.lerp(a.mesh.rotation.z, 0, delta * 4.0);
+        }
+      }
 
       // Check crosswalk stop line
       let shouldStop = false;
@@ -141,8 +158,6 @@ export class CrowdSimulationEngine {
       const walkBob = shouldStop ? 0.0 : Math.abs(Math.sin(time * 16.0 * a.speed)) * 0.012;
       a.mesh.position.y = 0.04 + curvatureDrop + walkBob;
       a.mesh.position.x = a.x;
-      a.mesh.position.z = a.z;
-
       a.mesh.position.z = a.z;
     }
   }

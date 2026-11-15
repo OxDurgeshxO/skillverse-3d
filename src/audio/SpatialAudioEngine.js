@@ -134,6 +134,36 @@ export class SpatialAudioEngine {
     } else if (skillType === 'space') {
       baseFreq = 175;
       waveType = 'sawtooth';
+    } else if (skillType === 'art') {
+      baseFreq = 295;
+      waveType = 'triangle';
+    } else if (skillType === 'writing') {
+      baseFreq = 190;
+      waveType = 'square';
+    } else if (skillType === 'finance') {
+      baseFreq = 145;
+      waveType = 'sawtooth';
+    } else if (skillType === 'cooking') {
+      baseFreq = 220;
+      waveType = 'sine';
+    } else if (skillType === 'sports') {
+      baseFreq = 120;
+      waveType = 'square';
+    } else if (skillType === 'teaching') {
+      baseFreq = 240;
+      waveType = 'triangle';
+    } else if (skillType === 'law') {
+      baseFreq = 150;
+      waveType = 'sawtooth';
+    } else if (skillType === 'agriculture') {
+      baseFreq = 165;
+      waveType = 'triangle';
+    } else if (skillType === 'photography') {
+      baseFreq = 275;
+      waveType = 'sine';
+    } else {
+      baseFreq = 160;
+      waveType = 'square';
     }
 
     const syllables = 3;
@@ -200,19 +230,22 @@ export class SpatialAudioEngine {
         listener.setPosition(p.x, p.y, p.z);
       }
 
-      // Forward vector and Up vector
+      // Forward vector and Up vector in world space
       if (typeof camera.getWorldDirection === 'function') {
         const forward = camera.getWorldDirection(new (camera.position.constructor)());
-        const up = camera.up || { x: 0, y: 1, z: 0 };
+        let upVec = camera.up || { x: 0, y: 1, z: 0 };
+        if (camera.quaternion && typeof camera.quaternion.clone === 'function') {
+          upVec = (new (camera.position.constructor)(0, 1, 0)).applyQuaternion(camera.quaternion);
+        }
         if (listener.forwardX) {
           listener.forwardX.setTargetAtTime(forward.x, now, 0.05);
           listener.forwardY.setTargetAtTime(forward.y, now, 0.05);
           listener.forwardZ.setTargetAtTime(forward.z, now, 0.05);
-          listener.upX.setTargetAtTime(up.x, now, 0.05);
-          listener.upY.setTargetAtTime(up.y, now, 0.05);
-          listener.upZ.setTargetAtTime(up.z, now, 0.05);
+          listener.upX.setTargetAtTime(upVec.x, now, 0.05);
+          listener.upY.setTargetAtTime(upVec.y, now, 0.05);
+          listener.upZ.setTargetAtTime(upVec.z, now, 0.05);
         } else if (typeof listener.setOrientation === 'function') {
-          listener.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+          listener.setOrientation(forward.x, forward.y, forward.z, upVec.x, upVec.y, upVec.z);
         }
       }
     } catch (err) {
@@ -356,10 +389,42 @@ export class SpatialAudioEngine {
   }
 
   /**
-   * Synthesize Doppler Maglev Transit Whoosh
+   * Set global master volume [0.0 - 1.0]
    */
-  playMaglevWhoosh(position = null) {
+  setMasterVolume(val = 0.4) {
+    this.masterVolume = Math.max(0.0, Math.min(1.0, Number(val) || 0.0));
+    if (this.masterGain && this.ctx) {
+      const targetGain = this.isMuted ? 0.0 : this.masterVolume;
+      this.masterGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  /**
+   * Toggle global audio mute
+   */
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+    if (this.masterGain && this.ctx) {
+      const targetGain = this.isMuted ? 0.0 : (this.masterVolume ?? 0.4);
+      this.masterGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.05);
+    }
+    return this.isMuted;
+  }
+
+  /**
+   * Synthesize Doppler Maglev Transit Whoosh with distance culling
+   */
+  playMaglevWhoosh(position = null, cameraPosition = null) {
     if (!this.isInitialized || this.isMuted || !this.ctx) return;
+
+    // Fix 8: Distance culling beyond 120 meters
+    if (position && cameraPosition) {
+      const dx = position.x - cameraPosition.x;
+      const dy = position.y - cameraPosition.y;
+      const dz = position.z - cameraPosition.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq > 14400) return; // 120m threshold
+    }
 
     try {
       const now = this.ctx.currentTime;
