@@ -14,6 +14,11 @@ import { CrowdSimulationEngine } from './world/CrowdSimulationEngine.js';
 import { GpuParticleSystem } from './shaders/GpuParticleSystem.js';
 import { PhysicsWorld } from './physics/PhysicsWorld.js';
 import { RobotVoiceAgentBridge } from './ai/RobotVoiceAgentBridge.js';
+import { WeatherEngine } from './world/WeatherEngine.js';
+import { DirectorWaypointEditor } from './ui/DirectorWaypointEditor.js';
+import { MultiAgentChatterEngine } from './ai/MultiAgentChatterEngine.js';
+import { SoundscapeMixer } from './ui/SoundscapeMixer.js';
+import { ZoneInteractions } from './ui/ZoneInteractions.js';
 
 /**
  * Security & Input Validation Helpers
@@ -418,6 +423,28 @@ class SkillverseApp {
         this.xrControllerRay = new THREE.Line(beamGeom, beamMat);
         this.xrController.add(this.xrControllerRay);
         this.scene.add(this.xrController);
+      }
+
+      // Secondary WebXR Left Hand Controller & Wrist Smartwatch HUD (Major 3)
+      this.xrControllerLeft = this.renderer.xr.getController(1);
+      if (this.xrControllerLeft) {
+        const watchGroup = new THREE.Group();
+        const strap = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.045, 0.045, 0.03, 16),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })
+        );
+        strap.rotation.z = Math.PI / 2;
+        watchGroup.add(strap);
+
+        const screen = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.008, 0.05),
+          new THREE.MeshBasicMaterial({ color: 0x00f0ff })
+        );
+        screen.position.y = 0.046;
+        watchGroup.add(screen);
+
+        this.xrControllerLeft.add(watchGroup);
+        this.scene.add(this.xrControllerLeft);
       }
     } catch (e) {
       // Non-fatal WebXR guard in headless mode
@@ -842,6 +869,202 @@ class SkillverseApp {
         }
       });
     }
+
+    // Shortcuts Legend Modal (Small 1)
+    const btnShortcuts = document.getElementById('btn-shortcuts');
+    const btnCloseShortcuts = document.getElementById('btn-close-shortcuts');
+    const shortcutsModal = document.getElementById('shortcuts-modal');
+    if (btnShortcuts && shortcutsModal) {
+      btnShortcuts.addEventListener('click', () => shortcutsModal.classList.add('visible'));
+    }
+    if (btnCloseShortcuts && shortcutsModal) {
+      btnCloseShortcuts.addEventListener('click', () => shortcutsModal.classList.remove('visible'));
+    }
+
+    // Weather Engine Toggle (Major 2)
+    const btnWeather = document.getElementById('btn-weather');
+    if (btnWeather) {
+      btnWeather.addEventListener('click', () => {
+        if (this.weatherEngine) {
+          const mode = this.weatherEngine.toggleWeather();
+          btnWeather.textContent = `🌦 Weather: ${mode}`;
+          this.showToast(`ATMOSPHERE SHIFT: ${mode} CONDITIONS ENGAGED`);
+        }
+      });
+    }
+
+    // 4K Cinematic Color LUTs (Medium 2)
+    const lutSelect = document.getElementById('lut-select');
+    if (lutSelect) {
+      lutSelect.addEventListener('change', (e) => {
+        if (this.postProcessing) {
+          this.postProcessing.setLUTMode(e.target.value);
+          this.showToast(`APPLIED 4K COLOR LUT: ${e.target.value}`);
+        }
+      });
+    }
+
+    // Soundscape Equalizer Mixer (Medium 3)
+    const btnSoundscape = document.getElementById('btn-soundscape');
+    const btnCloseSoundscape = document.getElementById('btn-close-soundscape');
+    const soundscapeModal = document.getElementById('soundscape-modal');
+    if (btnSoundscape && soundscapeModal) {
+      btnSoundscape.addEventListener('click', () => soundscapeModal.classList.add('visible'));
+    }
+    if (btnCloseSoundscape && soundscapeModal) {
+      btnCloseSoundscape.addEventListener('click', () => soundscapeModal.classList.remove('visible'));
+    }
+    document.querySelectorAll('.soundscape-slider').forEach(slider => {
+      slider.addEventListener('input', (e) => {
+        const ch = e.target.dataset.channel;
+        const val = parseFloat(e.target.value);
+        if (this.soundscapeMixer) {
+          this.soundscapeMixer.setVolume(ch, val);
+          const readout = document.getElementById(`vol-val-${ch}`);
+          if (readout) readout.textContent = `${Math.round(val * 100)}%`;
+        }
+      });
+    });
+
+    // Skill Quest Log (Major 1)
+    const btnQuests = document.getElementById('btn-quests');
+    const btnCloseQuests = document.getElementById('btn-close-quests');
+    const questModal = document.getElementById('quest-log-modal');
+    const questsContainer = document.getElementById('quests-list-container');
+    const renderQuests = () => {
+      if (!questsContainer || !this.chatterEngine) return;
+      questsContainer.innerHTML = '';
+      this.chatterEngine.getQuests().forEach(q => {
+        const item = document.createElement('div');
+        item.style.cssText = 'background: rgba(15,23,42,0.6); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center;';
+        item.innerHTML = `
+          <div>
+            <div style="font-weight: bold; color: ${q.status === 'COMPLETED' ? '#10b981' : q.status === 'ACTIVE' ? '#38bdf8' : '#fbbf24'};">${escapeHTML(q.title)} [${q.status}]</div>
+            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">Zone: ${escapeHTML(q.zone)} | Reward: ${escapeHTML(q.reward)}</div>
+            <div style="font-size: 10px; color: #cbd5e1; margin-top: 4px;">${escapeHTML(q.description)}</div>
+          </div>
+          <div>
+            ${q.status === 'AVAILABLE' ? `<button class="btn btn-sm btn-accept-quest" data-id="${q.id}" style="border-color: #38bdf8; color: #38bdf8; font-size: 10px; padding: 4px 8px;">Accept</button>` : q.status === 'ACTIVE' ? `<button class="btn btn-sm btn-complete-quest" data-id="${q.id}" style="border-color: #10b981; color: #10b981; font-size: 10px; padding: 4px 8px;">Complete</button>` : `<span style="color: #10b981;">✓ Done</span>`}
+          </div>
+        `;
+        questsContainer.appendChild(item);
+      });
+      questsContainer.querySelectorAll('.btn-accept-quest').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          this.chatterEngine.acceptQuest(e.target.dataset.id);
+          renderQuests();
+          this.showToast('QUEST ACCEPTED! CHECK TELEMETRY TARGET');
+        });
+      });
+      questsContainer.querySelectorAll('.btn-complete-quest').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          this.chatterEngine.completeQuest(e.target.dataset.id);
+          renderQuests();
+          this.showToast('🏆 QUEST COMPLETED! SKILL BADGE UNLOCKED');
+        });
+      });
+    };
+    if (btnQuests && questModal) {
+      btnQuests.addEventListener('click', () => {
+        renderQuests();
+        questModal.classList.add('visible');
+      });
+    }
+    if (btnCloseQuests && questModal) {
+      btnCloseQuests.addEventListener('click', () => questModal.classList.remove('visible'));
+    }
+
+    // Director Waypoints Editor (Medium 1)
+    const btnWaypoints = document.getElementById('btn-waypoints');
+    const btnCloseWaypoints = document.getElementById('btn-close-waypoints');
+    const waypointsModal = document.getElementById('waypoints-modal');
+    const renderWaypoints = () => {
+      const box = document.getElementById('waypoint-list-box');
+      if (!box || !this.waypointEditor) return;
+      box.innerHTML = '';
+      this.waypointEditor.waypoints.forEach((wp, idx) => {
+        const d = document.createElement('div');
+        d.style.cssText = 'display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 4px;';
+        d.innerHTML = `<span>#${idx + 1} ${escapeHTML(wp.name)} (${wp.focal}mm, ${wp.duration}s)</span><button class="btn-del-wp" data-id="${wp.id}" style="background: none; border: none; color: #ef4444; cursor: pointer;">✕</button>`;
+        box.appendChild(d);
+      });
+      box.querySelectorAll('.btn-del-wp').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          this.waypointEditor.removeWaypoint(Number(e.target.dataset.id));
+          renderWaypoints();
+        });
+      });
+    };
+    if (btnWaypoints && waypointsModal) {
+      btnWaypoints.addEventListener('click', () => {
+        renderWaypoints();
+        waypointsModal.classList.add('visible');
+      });
+    }
+    if (btnCloseWaypoints && waypointsModal) {
+      btnCloseWaypoints.addEventListener('click', () => waypointsModal.classList.remove('visible'));
+    }
+    document.getElementById('btn-add-waypoint')?.addEventListener('click', () => {
+      if (this.waypointEditor) {
+        this.waypointEditor.addWaypoint(this.camera.position, this.controls.target, 3.0, 24, `Waypoint ${this.waypointEditor.waypoints.length + 1}`);
+        renderWaypoints();
+        this.showToast('ADDED CAMERA WAYPOINT TO SPLINE');
+      }
+    });
+    document.getElementById('btn-export-waypoints')?.addEventListener('click', () => {
+      if (this.waypointEditor) {
+        const json = this.waypointEditor.exportToJSON();
+        navigator.clipboard?.writeText(json);
+        this.showToast('COPIED WAYPOINT JSON TO CLIPBOARD');
+      }
+    });
+
+    // Zone Micro-Activities (Medium 5)
+    const btnActivities = document.getElementById('btn-activities');
+    const btnCloseActivities = document.getElementById('btn-close-activities');
+    const activitiesModal = document.getElementById('activities-modal');
+    if (btnActivities && activitiesModal) {
+      btnActivities.addEventListener('click', () => activitiesModal.classList.add('visible'));
+    }
+    if (btnCloseActivities && activitiesModal) {
+      btnCloseActivities.addEventListener('click', () => activitiesModal.classList.remove('visible'));
+    }
+    document.getElementById('btn-submit-syntax')?.addEventListener('click', () => {
+      const code = document.getElementById('syntax-puzzle-input')?.value || '';
+      if (this.zoneInteractions) {
+        this.zoneInteractions.solveTerminalPuzzle(code);
+      }
+    });
+    document.getElementById('btn-sprint-start')?.addEventListener('click', () => {
+      if (this.zoneInteractions) {
+        this.zoneInteractions.startSprint();
+        this.showToast('100M SPRINT STARTED! RUN!');
+      }
+    });
+    document.getElementById('btn-sprint-stop')?.addEventListener('click', () => {
+      if (this.zoneInteractions) {
+        const t = this.zoneInteractions.stopSprint();
+        const readout = document.getElementById('sprint-timer-val');
+        if (readout) readout.textContent = `${t.toFixed(2)}s`;
+      }
+    });
+    document.querySelectorAll('.spray-color-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.spray-color-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (this.zoneInteractions) {
+          this.zoneInteractions.setSprayColor(btn.dataset.color);
+          this.showToast(`PIGMENT LOADED: ${btn.textContent.toUpperCase()}`);
+        }
+      });
+    });
+
+    // Mobile & Touch Gesture Support for Sliders (Fix 5)
+    const rangeSliders = [this.timelineSlider, document.getElementById('time-of-day-slider')].filter(Boolean);
+    rangeSliders.forEach(slider => {
+      slider.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+      slider.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: true });
+    });
   }
 
   initKeyboardShortcuts() {
@@ -882,6 +1105,11 @@ class SkillverseApp {
         document.getElementById('dialogue-terminal')?.classList.remove('open');
         document.getElementById('inspector-card')?.classList.remove('visible');
         document.getElementById('world-controls-dropdown')?.classList.remove('open');
+        document.getElementById('shortcuts-modal')?.classList.remove('visible');
+        document.getElementById('soundscape-modal')?.classList.remove('visible');
+        document.getElementById('quest-log-modal')?.classList.remove('visible');
+        document.getElementById('waypoints-modal')?.classList.remove('visible');
+        document.getElementById('activities-modal')?.classList.remove('visible');
         if (this.customizerModal) this.customizerModal.close();
       }
     });
@@ -1108,9 +1336,43 @@ class SkillverseApp {
 
     this.setCameraMode('orbit');
     const t = targets[zoneKey];
-    this.camera.position.set(...t.cam);
-    this.controls.target.set(...t.target);
-    this.showToast(`TELEPORTED TO ZONE: ${zoneKey.toUpperCase().replace('-', ' ')}`);
+
+    // Small 4: Smooth Camera Bezier Glide (1.2s duration)
+    const startPos = this.camera.position.clone();
+    const targetPos = new THREE.Vector3(...t.cam);
+    const startTarget = this.controls.target.clone();
+    const endTarget = new THREE.Vector3(...t.target);
+    const midpoint = startPos.clone().lerp(targetPos, 0.5);
+    midpoint.y += Math.max(35, startPos.distanceTo(targetPos) * 0.18);
+
+    const duration = 1.2;
+    const startTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+    if (this._glideAnim) cancelAnimationFrame(this._glideAnim);
+
+    const animateGlide = () => {
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      const progress = Math.min(1.0, (now - startTime) / (duration * 1000));
+      const ease = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      const oneMinusT = 1 - ease;
+      this.camera.position.set(
+        oneMinusT * oneMinusT * startPos.x + 2 * oneMinusT * ease * midpoint.x + ease * ease * targetPos.x,
+        oneMinusT * oneMinusT * startPos.y + 2 * oneMinusT * ease * midpoint.y + ease * ease * targetPos.y,
+        oneMinusT * oneMinusT * startPos.z + 2 * oneMinusT * ease * midpoint.z + ease * ease * targetPos.z
+      );
+      this.controls.target.lerpVectors(startTarget, endTarget, ease);
+
+      if (progress < 1.0) {
+        this._glideAnim = requestAnimationFrame(animateGlide);
+      } else {
+        this._glideAnim = null;
+      }
+    };
+    animateGlide();
+    this.showToast(`FLYING TO ZONE: ${zoneKey.toUpperCase().replace('-', ' ')}`);
   }
 
   updateActiveBtn(btnList, activeBtn) {
@@ -1159,6 +1421,13 @@ class SkillverseApp {
       }
 
       this.voiceBridge = new RobotVoiceAgentBridge(this.audioEngine, this);
+
+      // Next-Gen Stages: Procedural Weather Engine, Waypoints, Multi-Agent Chatter, Soundscape & Zone Activities
+      this.weatherEngine = new WeatherEngine(this.scene, this.worldManager, this.postProcessing, this.audioEngine);
+      this.waypointEditor = new DirectorWaypointEditor(this);
+      this.chatterEngine = new MultiAgentChatterEngine(this.scene, this.audioEngine);
+      this.soundscapeMixer = new SoundscapeMixer(this.audioEngine);
+      this.zoneInteractions = new ZoneInteractions(this);
     } catch (err) {
       console.warn('[Skillverse] initStageEnhancements non-fatal warning:', err);
     }
@@ -1276,7 +1545,33 @@ class SkillverseApp {
 
     // 6. FPS Telemetry
     const fps = Math.round(1 / Math.max(delta, 0.001));
-    document.getElementById('hud-fps').textContent = `${fps} FPS`;
+    const fpsElem = document.getElementById('hud-fps');
+    if (fpsElem) fpsElem.textContent = `${fps} FPS`;
+
+    // Small 2: Compass Heading Dial & Altimeter
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    const deg = Math.round(((Math.atan2(dir.x, dir.z) * 180 / Math.PI) + 360) % 360);
+    const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const card = cardinals[Math.round(deg / 45) % 8];
+    const headingElem = document.getElementById('hud-heading');
+    if (headingElem) headingElem.textContent = `${deg.toString().padStart(3, '0')}° ${card}`;
+
+    // Small 5: Dynamic Favicon & Browser Title Telemetry
+    if (typeof document !== 'undefined') {
+      const activeZone = document.getElementById('hud-zone')?.textContent || 'ORBITAL VIEW';
+      document.title = `[${activeZone} • ${fps} FPS] Skillverse 3D`;
+    }
+
+    // Weather Engine Update (Major 2)
+    if (this.weatherEngine) {
+      this.weatherEngine.update(delta, time, this.camera);
+    }
+
+    // Multi-Agent Inhabitant Chatter Engine (Major 1 & Medium 4)
+    if (this.chatterEngine) {
+      this.chatterEngine.update(delta, time, this.activeRobots);
+    }
 
     // 6b. WebXR 6-DoF Controller Raycast Teleportation
     if (this.renderer?.xr?.isPresenting && this.xrIsTeleporting && this.xrController && this.xrTeleportMarker) {

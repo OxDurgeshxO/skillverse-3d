@@ -134,6 +134,18 @@ export class ExplorerAvatar {
 
     // Position walking down Tech City boulevard heading toward maglev station
     this.group.position.set(-0.5, 0.05, 54);
+
+    this.dustPuffs = [];
+    if (this.scene) {
+      const geom = new THREE.SphereGeometry(0.04, 6, 6);
+      for (let i = 0; i < 8; i++) {
+        const mat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.0 });
+        const puff = new THREE.Mesh(geom, mat);
+        puff.visible = false;
+        this.scene.add(puff);
+        this.dustPuffs.push({ mesh: puff, life: 0 });
+      }
+    }
   }
 
   update(delta, time) {
@@ -146,6 +158,30 @@ export class ExplorerAvatar {
 
     this.torso.position.y = 1.18 + Math.abs(Math.sin(time * walkSpeed)) * 0.03;
     this.head.position.y = 1.62 + Math.abs(Math.sin(time * walkSpeed)) * 0.03;
+
+    // Small 3: Surface footstep decals & ground dust puffs
+    if (this.dustPuffs && Math.abs(Math.cos(time * walkSpeed)) > 0.96) {
+      const puff = this.dustPuffs.find(p => p.life <= 0);
+      if (puff) {
+        puff.mesh.position.set(this.group.position.x + (Math.random() - 0.5) * 0.1, 0.02, this.group.position.z);
+        puff.mesh.scale.setScalar(0.8);
+        puff.mesh.material.opacity = 0.5;
+        puff.mesh.visible = true;
+        puff.life = 0.45;
+      }
+    }
+
+    if (this.dustPuffs) {
+      this.dustPuffs.forEach(p => {
+        if (p.life > 0) {
+          p.life -= delta;
+          p.mesh.position.y += delta * 0.15;
+          p.mesh.scale.multiplyScalar(1.0 + delta * 1.5);
+          p.mesh.material.opacity = Math.max(0.0, p.life * 1.1);
+          if (p.life <= 0) p.mesh.visible = false;
+        }
+      });
+    }
 
     if (this.holoScreenMat && this.holoScreenMat.uniforms) {
       this.holoScreenMat.uniforms.uTime.value = time;

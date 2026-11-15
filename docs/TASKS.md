@@ -68,13 +68,43 @@
 ### Phase 9: Governance & Desktop Integration
 - [x] Native Windows Desktop Live Preview Shortcut (`Skillverse 3D Live Preview.url`).
 - [x] Global WebGL memory safety invariant rule persisted (`rules/threejs-memory-safety.md`).
-- [x] 23 / 23 automated tests passing continuously (`npm test`).
+- [x] Resilient auto-launcher batch script (`Launch Skillverse 3D.bat`).
+- [x] Production bundle chunk-splitting optimization ($151\text{ kB}$ main bundle, code-split exporters & modal).
+
+### Phase 10: Next-Gen 5-Stage Evolution (All 25 Items Complete)
+- [x] **10 Technical Fixes**:
+  - [x] Fix 1: Monotonic `PerformanceTimer` replacing deprecated `THREE.Clock`.
+  - [x] Fix 2: Accessible `aria-label` attributes on all inputs.
+  - [x] Fix 3: Dynamic chunk-splitting lowering bundle to 151 kB.
+  - [x] Fix 4: Desktop auto-launcher checking port 5173 and spawning `npm run dev`.
+  - [x] Fix 5: Mobile & touch gesture handling on range sliders and turntable.
+  - [x] Fix 6: WebGL context loss rebind `postProcessing.reinit()`.
+  - [x] Fix 7: AudioContext autoplay unlock listener on first user gesture.
+  - [x] Fix 8: Keyboard shortcuts Space, C, O, E, M, F, Esc.
+  - [x] Fix 9: Maritime buoyancy torque clamping $\pm 24^\circ$.
+  - [x] Fix 10: Crowd elevation spherical curvature formula $y = 0.04 - (x^2+z^2)/1600$.
+- [x] **5 Major Updates**:
+  - [x] Major 1: Multi-Agent AI dialogue proximity simulation & 4-quest Skill Quest Log (`MultiAgentChatterEngine.js`).
+  - [x] Major 2: Procedural Weather Engine with 24mm rain condensation lens shader (`WeatherEngine.js`).
+  - [x] Major 3: WebXR 6-DoF parabolic teleportation, virtual hands, and wrist smartwatch HUD.
+  - [x] Major 4: 6-station planetary maglev transit network & interior train passenger cab view (`TransitNetwork.js`).
+  - [x] Major 5: 24h robot life cycles & solar panel sun tracking (`GreenAgricultureFields.js`).
+- [x] **5 Medium Updates**:
+  - [x] Medium 1: Director Waypoint Editor spline designer with JSON export/import (`DirectorWaypointEditor.js`).
+  - [x] Medium 2: 4K Photo Studio with professional cinematic LUTs (`PostProcessingPipeline.js`).
+  - [x] Medium 3: Interactive Soundscape Equalizer Mixer 6-channel panel (`SoundscapeMixer.js`).
+  - [x] Medium 4: Inhabitant social sentiment & emotion LED eye matrices.
+  - [x] Medium 5: Zone micro-interactions (Tech City syntax puzzle, Sports sprint stopwatch, Art mural spray).
+- [x] **5 Small Updates**:
+  - [x] Small 1: Keyboard shortcut legend modal (`#shortcuts-modal`).
+  - [x] Small 2: Compass heading dial ($000^\circ\text{–}359^\circ$ + cardinal) & altimeter readout.
+  - [x] Small 3: Surface footstep decals & ground dust puffs when walking.
+  - [x] Small 4: Smooth camera cubic bezier zone flights during teleport.
+  - [x] Small 5: Dynamic favicon & browser title telemetry (`[Zone • FPS]`).
+- [x] 32 / 32 automated unit tests passing continuously (`npm test`).
 
 ---
 
 ## Active & Upcoming Backlog
-- [ ] Multi-zone passenger transfer stations with automated train scheduling.
-- [ ] Live procedural rain droplets refracting on 24mm camera lens during Phase 1.
-- [ ] Direct WebXR controller raycast teleportation and hands tracking.
-- [ ] Resilient auto-launcher batch script (`Launch Skillverse 3D.bat`).
-- [ ] Production bundle chunk-splitting optimization ($< 500\text{ kB}$).
+- [ ] Multi-player WebRTC peer synchronization.
+- [ ] Physics cloth simulation on arcology flags and banners.

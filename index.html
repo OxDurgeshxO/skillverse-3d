@@ -983,6 +983,10 @@
           <span class="telemetry-value" id="hud-zone">ORBITAL VIEW</span>
         </div>
         <div class="telemetry-item">
+          <span class="telemetry-label">Heading</span>
+          <span class="telemetry-value" id="hud-heading" style="color: #38bdf8;">000° N</span>
+        </div>
+        <div class="telemetry-item">
           <span class="telemetry-label">FPS</span>
           <span class="telemetry-value" id="hud-fps">60 FPS</span>
         </div>
@@ -1093,6 +1097,9 @@
           <button class="btn btn-menu" id="btn-world-menu">
             <span>⚙️ World Controls</span> <span id="menu-arrow">▾</span>
           </button>
+          <button class="btn btn-menu" id="btn-shortcuts" style="padding: 8px 12px;" aria-label="Toggle Keyboard Shortcut Guide">
+            <span>⌨️</span>
+          </button>
 
           <!-- Collapsible Dropdown Controls Menu -->
           <div id="world-controls-dropdown" class="controls-dropdown-menu">
@@ -1129,12 +1136,14 @@
             <div class="dropdown-divider"></div>
 
             <div class="dropdown-section">
-              <div class="dropdown-section-title"><span>☀️</span> Atmosphere & Immersion</div>
+              <div class="dropdown-section-title"><span>☀️</span> Atmosphere & Weather</div>
               <div class="dropdown-btn-grid">
+                <button class="btn" id="btn-weather" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">🌦 Weather: CLEAR</button>
                 <button class="btn" id="btn-festival" style="color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);">☀️ Golden Hour</button>
                 <button class="btn" id="btn-aspect">Aspect: 16:9 Full</button>
                 <button class="btn" id="btn-webxr" style="color: #c084fc; border-color: rgba(192, 132, 252, 0.4);">🥽 WebXR VR</button>
                 <button class="btn" id="btn-audio">🔊 Audio: ON</button>
+                <button class="btn" id="btn-soundscape" style="color: #a78bfa; border-color: rgba(167, 139, 250, 0.4);">🎚 Soundscape</button>
               </div>
               <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px;">
                 <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #94a3b8;">
@@ -1148,20 +1157,36 @@
             <div class="dropdown-divider"></div>
 
             <div class="dropdown-section">
-              <div class="dropdown-section-title"><span>🎬</span> Director Studio & Capture</div>
+              <div class="dropdown-section-title"><span>🎬</span> Director Studio & 4K LUTs</div>
               <div class="dropdown-btn-grid">
                 <button class="btn" id="btn-take-snapshot">📸 4K Photo</button>
                 <button class="btn" id="btn-record-clip">🎥 Record 10s</button>
                 <button class="btn" id="btn-toggle-pip">🛰 PiP Cam</button>
+                <button class="btn" id="btn-waypoints" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">📐 Waypoints</button>
                 <button class="btn" id="btn-open-customizer" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">🛠 Robot Builder</button>
+              </div>
+              <div style="margin-top: 8px;">
+                <label for="lut-select" style="display: block; font-size: 10px; font-family: 'JetBrains Mono', monospace; color: #94a3b8; margin-bottom: 4px;">CINEMATIC COLOR LUT</label>
+                <select class="select-dropdown" id="lut-select" aria-label="Cinematic Color LUT Preset" style="width: 100%;">
+                  <option value="NONE">Neutral Standard (Direct Sensor)</option>
+                  <option value="CYBERPUNK">Cyberpunk Neon (Cyan / Magenta)</option>
+                  <option value="GOLDEN_HOUR">Golden Hour 3200K (Amber Glow)</option>
+                  <option value="MATRIX_TEAL">Matrix Teal (Atmospheric Emerald)</option>
+                  <option value="MOONLIGHT_NOIR">Moonlight Noir (Sapphire Contrast)</option>
+                  <option value="TECHNICOLOR">Vintage Technicolor (Dual-Strip 1950s)</option>
+                </select>
               </div>
             </div>
 
             <div class="dropdown-divider"></div>
 
             <div class="dropdown-section">
-              <div class="dropdown-section-title"><span>🤖</span> Planetary Inhabitants</div>
-              <button class="btn" id="btn-roster" style="width: 100%; justify-content: center; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">
+              <div class="dropdown-section-title"><span>🤖</span> Inhabitants & Quests</div>
+              <div class="dropdown-btn-grid">
+                <button class="btn" id="btn-quests" style="color: #34d399; border-color: rgba(52, 211, 153, 0.4);">📜 Skill Quest Log</button>
+                <button class="btn" id="btn-activities" style="color: #fbbf24; border-color: rgba(251, 191, 36, 0.4);">⚡ Zone Activities</button>
+              </div>
+              <button class="btn" id="btn-roster" style="width: 100%; justify-content: center; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); margin-top: 6px;">
                 🤖 18 Embodied Skills Roster
               </button>
             </div>
@@ -1169,6 +1194,188 @@
         </div>
       </div>
     </footer>
+  </div>
+
+  <!-- Keyboard Shortcut Legend Modal -->
+  <div id="shortcuts-modal" class="customizer-backdrop">
+    <div class="customizer-window" style="max-width: 480px;">
+      <div class="customizer-header">
+        <div class="customizer-title-group">
+          <span class="customizer-icon">⌨️</span>
+          <div>
+            <div class="customizer-title">Keyboard Navigation Controls</div>
+            <div class="customizer-subtitle">GLOBAL POWER USER HOTKEYS</div>
+          </div>
+        </div>
+        <button class="customizer-close" id="btn-close-shortcuts">✕</button>
+      </div>
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #cbd5e1;">
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">
+          <span>Play / Pause Cinematic Sequence</span>
+          <kbd style="background: rgba(56,189,248,0.2); border: 1px solid #38bdf8; border-radius: 4px; padding: 2px 8px; color: #7dd3fc;">Space</kbd>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">
+          <span>Switch Camera Mode</span>
+          <div>
+            <kbd style="background: #1e293b; border-radius: 4px; padding: 2px 6px;">C</kbd>
+            <kbd style="background: #1e293b; border-radius: 4px; padding: 2px 6px;">O</kbd>
+            <kbd style="background: #1e293b; border-radius: 4px; padding: 2px 6px;">E</kbd>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">
+          <span>Toggle World Controls Dropdown</span>
+          <kbd style="background: #1e293b; border-radius: 4px; padding: 2px 6px;">M</kbd>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">
+          <span>Toggle Night Festival / Golden Hour</span>
+          <kbd style="background: #1e293b; border-radius: 4px; padding: 2px 6px;">F</kbd>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px;">
+          <span>Close Modals / Exit Inspect</span>
+          <kbd style="background: #1e293b; border-radius: 4px; padding: 2px 6px;">Esc</kbd>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Soundscape Equalizer Mixer Modal (Medium 3) -->
+  <div id="soundscape-modal" class="customizer-backdrop">
+    <div class="customizer-window" style="max-width: 480px;">
+      <div class="customizer-header">
+        <div class="customizer-title-group">
+          <span class="customizer-icon">🎚</span>
+          <div>
+            <div class="customizer-title">Soundscape Equalizer Mixer</div>
+            <div class="customizer-subtitle">6-CHANNEL SPATIAL AUDIO ACOUSTICS</div>
+          </div>
+        </div>
+        <button class="customizer-close" id="btn-close-soundscape">✕</button>
+      </div>
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #cbd5e1;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between;"><span>Stratosphere Wind</span><span id="vol-val-wind">85%</span></div>
+          <input type="range" class="soundscape-slider" data-channel="wind" min="0" max="1" step="0.05" value="0.85" aria-label="Stratosphere Wind Volume">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between;"><span>Urban Tech City Hum</span><span id="vol-val-city">75%</span></div>
+          <input type="range" class="soundscape-slider" data-channel="city" min="0" max="1" step="0.05" value="0.75" aria-label="Urban City Hum Volume">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between;"><span>Maglev Transit Monorail</span><span id="vol-val-transit">80%</span></div>
+          <input type="range" class="soundscape-slider" data-channel="transit" min="0" max="1" step="0.05" value="0.80" aria-label="Maglev Monorail Volume">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between;"><span>Waterfalls & Ocean Spray</span><span id="vol-val-waterfall">60%</span></div>
+          <input type="range" class="soundscape-slider" data-channel="waterfall" min="0" max="1" step="0.05" value="0.60" aria-label="Waterfalls Volume">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between;"><span>Robot Vocals & Formant Chimes</span><span id="vol-val-robot">90%</span></div>
+          <input type="range" class="soundscape-slider" data-channel="robot" min="0" max="1" step="0.05" value="0.90" aria-label="Robot Vocals Volume">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; justify-content: space-between;"><span>Harmonic Ambient Synth</span><span id="vol-val-synth">70%</span></div>
+          <input type="range" class="soundscape-slider" data-channel="synth" min="0" max="1" step="0.05" value="0.70" aria-label="Harmonic Synth Volume">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skill Quest Log Modal (Major 1) -->
+  <div id="quest-log-modal" class="customizer-backdrop">
+    <div class="customizer-window" style="max-width: 540px;">
+      <div class="customizer-header">
+        <div class="customizer-title-group">
+          <span class="customizer-icon">📜</span>
+          <div>
+            <div class="customizer-title">Planetary Skill Quest Log</div>
+            <div class="customizer-subtitle">INTERACTIVE INHABITANT EXPEDITIONS</div>
+          </div>
+        </div>
+        <button class="customizer-close" id="btn-close-quests">✕</button>
+      </div>
+      <div id="quests-list-container" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; max-height: 400px; overflow-y: auto;">
+        <!-- Dynamically rendered quest items -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Director Waypoint Editor Modal (Medium 1) -->
+  <div id="waypoints-modal" class="customizer-backdrop">
+    <div class="customizer-window" style="max-width: 520px;">
+      <div class="customizer-header">
+        <div class="customizer-title-group">
+          <span class="customizer-icon">📐</span>
+          <div>
+            <div class="customizer-title">Director Waypoint Editor</div>
+            <div class="customizer-subtitle">CINEMATIC SPLINE TRAJECTORY DESIGNER</div>
+          </div>
+        </div>
+        <button class="customizer-close" id="btn-close-waypoints">✕</button>
+      </div>
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #cbd5e1;">
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primary" id="btn-add-waypoint" style="flex: 1;">➕ Add Current Camera</button>
+          <button class="btn" id="btn-play-waypoints" style="flex: 1; border-color: #38bdf8; color: #38bdf8;">▶ Play Waypoints</button>
+        </div>
+        <div id="waypoint-list-box" style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+          <!-- Dynamic waypoints -->
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn" id="btn-export-waypoints" style="flex: 1;">📥 Export JSON</button>
+          <button class="btn" id="btn-import-waypoints" style="flex: 1;">📤 Import JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone Micro-Activities Modal (Medium 5) -->
+  <div id="activities-modal" class="customizer-backdrop">
+    <div class="customizer-window" style="max-width: 520px;">
+      <div class="customizer-header">
+        <div class="customizer-title-group">
+          <span class="customizer-icon">⚡</span>
+          <div>
+            <div class="customizer-title">Zone Micro-Interactions</div>
+            <div class="customizer-subtitle">HOLOGRAPHIC PUZZLES & SPRINT TRIALS</div>
+          </div>
+        </div>
+        <button class="customizer-close" id="btn-close-activities">✕</button>
+      </div>
+      <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #cbd5e1;">
+        <!-- Activity 1: Tech City Terminal -->
+        <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 6px; border: 1px solid rgba(56,189,248,0.2);">
+          <div style="color: #38bdf8; font-weight: bold; margin-bottom: 6px;">💻 Tech City Smart Grid Syntax Puzzle</div>
+          <div style="font-size: 10px; color: #94a3b8; margin-bottom: 8px;">Fix the quantum energy aggregation algorithm:</div>
+          <textarea id="syntax-puzzle-input" rows="3" style="width: 100%; background: #09090b; color: #38bdf8; border: 1px solid #334155; border-radius: 4px; padding: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px;">nodes.filter(n => n.active).reduce((sum, n) => sum + n.mw, 0)</textarea>
+          <button class="btn btn-primary" id="btn-submit-syntax" style="margin-top: 6px; width: 100%;">Verify & Synchronize Grid</button>
+        </div>
+
+        <!-- Activity 2: Sports Arena Sprint -->
+        <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.2);">
+          <div style="color: #fbbf24; font-weight: bold; margin-bottom: 6px;">🏃 Sports Arena 100m Kinetic Sprint</div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 10px; color: #94a3b8;">Sprint Timer:</span>
+            <span id="sprint-timer-val" style="font-size: 16px; font-weight: bold; color: #f59e0b;">00.00s</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn" id="btn-sprint-start" style="flex: 1; border-color: #10b981; color: #10b981;">▶ Start Sprint</button>
+            <button class="btn" id="btn-sprint-stop" style="flex: 1; border-color: #ef4444; color: #ef4444;">⏹ Finish</button>
+          </div>
+        </div>
+
+        <!-- Activity 3: Art District Spray Paint -->
+        <div style="background: rgba(15,23,42,0.6); padding: 12px; border-radius: 6px; border: 1px solid rgba(236,72,153,0.2);">
+          <div style="color: #f472b6; font-weight: bold; margin-bottom: 6px;">🎨 Art District Arcology Spray Paint</div>
+          <div style="font-size: 10px; color: #94a3b8; margin-bottom: 6px;">Select active laser pigment:</div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn spray-color-btn active" data-color="#00f0ff" style="flex: 1; border-color: #00f0ff; color: #00f0ff;">Cyan</button>
+            <button class="btn spray-color-btn" data-color="#fbbf24" style="flex: 1; border-color: #fbbf24; color: #fbbf24;">Gold</button>
+            <button class="btn spray-color-btn" data-color="#ec4899" style="flex: 1; border-color: #ec4899; color: #ec4899;">Neon Pink</button>
+            <button class="btn spray-color-btn" data-color="#10b981" style="flex: 1; border-color: #10b981; color: #10b981;">Emerald</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

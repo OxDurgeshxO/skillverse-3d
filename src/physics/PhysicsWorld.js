@@ -74,12 +74,15 @@ export class PhysicsWorld {
       b.vy += ay * dt;
       pos.y += b.vy * dt;
 
-      // 3. Hydrodynamic pitch & roll torque alignment
-      const targetPitch = waveGrad.gradZ * 0.65;
-      const targetRoll = -waveGrad.gradX * 0.65;
+      // 3. Hydrodynamic pitch & roll torque alignment with safe maritime angular clamping (+-24 deg)
+      const maxAngle = 0.42; // ~24 degrees maximum list/trim
+      const targetPitch = Math.max(-maxAngle, Math.min(maxAngle, waveGrad.gradZ * 0.65));
+      const targetRoll = Math.max(-maxAngle, Math.min(maxAngle, -waveGrad.gradX * 0.65));
 
       b.pitch += (targetPitch - b.pitch) * dt * 3.5;
       b.roll += (targetRoll - b.roll) * dt * 3.5;
+      b.pitch = Math.max(-maxAngle, Math.min(maxAngle, b.pitch));
+      b.roll = Math.max(-maxAngle, Math.min(maxAngle, b.roll));
 
       b.mesh.rotation.x = b.pitch;
       b.mesh.rotation.z = b.roll;

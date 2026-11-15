@@ -18,42 +18,26 @@ export class TransitNetwork {
 
   buildMaglevStation() {
     this.stationGroup = new THREE.Group();
+    this.stations = [
+      { name: 'Tech City Central Depot', pos: [0, 7.2, 70], rotY: 0 },
+      { name: 'Engineering Harbor Station', pos: [240, 6.5, -40], rotY: Math.PI / 4 },
+      { name: 'Space Launch Gantry Station', pos: [420, 14.5, -260], rotY: -Math.PI / 3 },
+      { name: 'Global University Spire Depot', pos: [80, 9.5, -120], rotY: Math.PI / 2 },
+      { name: 'Green Agriculture Terminal', pos: [-150, 7.0, -60], rotY: -Math.PI / 4 },
+      { name: 'Creative Art District Station', pos: [-90, 8.0, 65], rotY: 0 }
+    ];
 
-    // Structural support pylons flanking boulevard at x = -14 and x = 14
     const pylonGeom = new THREE.BoxGeometry(2.4, 7.2, 3.2);
     const pylonMat = new THREE.MeshStandardMaterial({
       color: 0x1e293b,
       metalness: 0.8,
       roughness: 0.3
     });
-    const pylonL = new THREE.Mesh(pylonGeom, pylonMat);
-    pylonL.position.set(-14, 3.6, 70);
-    pylonL.castShadow = true;
-    pylonL.receiveShadow = true;
-    this.stationGroup.add(pylonL);
-
-    const pylonR = new THREE.Mesh(pylonGeom, pylonMat);
-    pylonR.position.set(14, 3.6, 70);
-    pylonR.castShadow = true;
-    pylonR.receiveShadow = true;
-    this.stationGroup.add(pylonR);
-
-    // Elevated station platform deck bridging across boulevard
-    const deckGeom = new THREE.BoxGeometry(72, 0.9, 7.5);
     const deckMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
       metalness: 0.85,
       roughness: 0.2
     });
-    const deck = new THREE.Mesh(deckGeom, deckMat);
-    deck.position.set(0, 6.7, 70);
-    deck.castShadow = true;
-    deck.receiveShadow = true;
-    this.stationGroup.add(deck);
-
-    // Translucent curved glass canopy covering station platform
-    const canopyGeom = new THREE.CylinderGeometry(8, 8, 56, 32, 1, true, 0, Math.PI);
-    canopyGeom.rotateZ(Math.PI / 2);
     const canopyMat = new THREE.MeshPhysicalMaterial({
       color: 0x38bdf8,
       transparent: true,
@@ -63,34 +47,54 @@ export class TransitNetwork {
       transmission: 0.8,
       side: THREE.DoubleSide
     });
-    const canopy = new THREE.Mesh(canopyGeom, canopyMat);
-    canopy.position.set(0, 8.8, 70);
-    this.stationGroup.add(canopy);
-
-    // Glowing cyan maglev monorail guide beam
-    const beamGeom = new THREE.BoxGeometry(160, 0.5, 0.7);
-    const beamMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
-    const beam = new THREE.Mesh(beamGeom, beamMat);
-    beam.position.set(0, 7.2, 70);
-    this.stationGroup.add(beam);
-
-    // Station holographic sign
-    const signGeom = new THREE.PlaneGeometry(12, 1.4);
     const signMat = new THREE.MeshBasicMaterial({
       color: 0x00f0ff,
       transparent: true,
       opacity: 0.85,
       side: THREE.DoubleSide
     });
-    const sign = new THREE.Mesh(signGeom, signMat);
-    sign.position.set(0, 9.8, 66.2);
-    this.stationGroup.add(sign);
-
-    // Platform edge safety warning lights
     const edgeLightMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-    const edgeL = new THREE.Mesh(new THREE.BoxGeometry(50, 0.08, 0.15), edgeLightMat);
-    edgeL.position.set(0, 7.18, 67.2);
-    this.stationGroup.add(edgeL);
+
+    this.stations.forEach((st, idx) => {
+      const singleStation = new THREE.Group();
+      singleStation.position.set(...st.pos);
+      singleStation.rotation.y = st.rotY;
+
+      // Pylons
+      const pL = new THREE.Mesh(pylonGeom, pylonMat);
+      pL.position.set(-14, -3.6, 0);
+      singleStation.add(pL);
+
+      const pR = new THREE.Mesh(pylonGeom, pylonMat);
+      pR.position.set(14, -3.6, 0);
+      singleStation.add(pR);
+
+      // Deck
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(idx === 0 ? 72 : 36, 0.8, 6.5), deckMat);
+      deck.position.y = -0.5;
+      singleStation.add(deck);
+
+      // Canopy
+      const canopy = new THREE.Mesh(
+        new THREE.CylinderGeometry(6, 6, idx === 0 ? 56 : 28, 24, 1, true, 0, Math.PI),
+        canopyMat
+      );
+      canopy.geometry.rotateZ(Math.PI / 2);
+      canopy.position.y = 1.6;
+      singleStation.add(canopy);
+
+      // Station Sign
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.2), signMat);
+      sign.position.set(0, 2.6, -3.4);
+      singleStation.add(sign);
+
+      // Warning edge lights
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(idx === 0 ? 50 : 25, 0.08, 0.15), edgeLightMat);
+      edge.position.set(0, -0.05, -2.8);
+      singleStation.add(edge);
+
+      this.stationGroup.add(singleStation);
+    });
 
     this.group.add(this.stationGroup);
   }
@@ -117,6 +121,7 @@ export class TransitNetwork {
     ];
 
     const railCurve = new THREE.CatmullRomCurve3(loopPoints, true, 'centripetal');
+    this.trackSpline = railCurve;
 
     // Continuous extruded tube geometry for planetary monorail guide beam
     const tubeGeom = new THREE.TubeGeometry(railCurve, 128, 0.35, 8, true);

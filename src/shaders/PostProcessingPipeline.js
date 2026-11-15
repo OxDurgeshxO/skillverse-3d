@@ -141,6 +141,76 @@ export const LensCondensationShader = {
   `
 };
 
+/**
+ * Professional 4K Cinematic LUT Color Grading Shader (Medium 2)
+ * Applies calibrated color transforms:
+ * 0: Neutral (pass-through)
+ * 1: Cyberpunk Neon (cyan/magenta split tone)
+ * 2: Golden Hour 3200K (amber warmth)
+ * 3: Matrix Teal (green-tinted deep cyan)
+ * 4: Moonlight Noir (high-contrast monochrome sapphire)
+ * 5: Vintage Technicolor (dual-strip saturation)
+ */
+export const CinematicLUTShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uLUTMode: { value: 0 } // 0: None, 1: Cyberpunk, 2: GoldenHour, 3: MatrixTeal, 4: Noir, 5: Technicolor
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform int uLUTMode;
+    varying vec2 vUv;
+
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      vec3 col = base.rgb;
+
+      if (uLUTMode == 1) {
+        // 1. Cyberpunk Neon: Boost cyans in highlights, magenta in shadows, deep blacks
+        float lum = dot(col, vec3(0.299, 0.587, 0.114));
+        vec3 shadows = vec3(0.2, 0.02, 0.35);
+        vec3 highlights = vec3(0.0, 0.95, 1.0);
+        col = mix(shadows, highlights, lum) * 0.45 + col * 0.75;
+        col = pow(col, vec3(1.15));
+      } else if (uLUTMode == 2) {
+        // 2. Golden Hour 3200K: Warm amber wash, golden glow
+        col.r = pow(col.r, 0.9) * 1.12;
+        col.g = pow(col.g, 0.95) * 1.04;
+        col.b = pow(col.b, 1.15) * 0.82;
+      } else if (uLUTMode == 3) {
+        // 3. Matrix Teal: Desaturated matrix green-teal
+        float lum = dot(col, vec3(0.3, 0.59, 0.11));
+        vec3 teal = vec3(0.05, 0.85, 0.75) * lum;
+        col = mix(col, teal, 0.42);
+        col = pow(col, vec3(1.1));
+      } else if (uLUTMode == 4) {
+        // 4. Moonlight Noir: Monochromatic with sapphire tint
+        float lum = dot(col, vec3(0.299, 0.587, 0.114));
+        vec3 noir = vec3(lum * 0.85, lum * 0.92, lum * 1.15);
+        col = mix(col, noir, 0.88);
+        col = smoothstep(0.08, 0.92, col);
+      } else if (uLUTMode == 5) {
+        // 5. Vintage Technicolor: Rich 1950s two-strip film look
+        col.r = pow(col.r, 0.85) * 1.15;
+        col.g = col.g * 0.98;
+        col.b = pow(col.b, 1.1) * 0.92;
+        float sat = 1.35;
+        float lum = dot(col, vec3(0.299, 0.587, 0.114));
+        col = mix(vec3(lum), col, sat);
+      }
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), base.a);
+    }
+  `
+};
+
 export class PostProcessingPipeline {
   constructor(renderer, scene, camera) {
     this.renderer = renderer;
@@ -187,7 +257,11 @@ export class PostProcessingPipeline {
     this.lensCondensationPass.uniforms.resolution.value.set(width, height);
     this.composer.addPass(this.lensCondensationPass);
 
-    // 5. Output Pass (Color space & tone mapping compliance)
+    // 5. Professional 4K Cinematic LUT Color Grading Pass (Medium 2)
+    this.lutPass = new ShaderPass(CinematicLUTShader);
+    this.composer.addPass(this.lutPass);
+
+    // 6. Output Pass (Color space & tone mapping compliance)
     this.outputPass = new OutputPass();
     this.composer.addPass(this.outputPass);
   }
@@ -216,6 +290,20 @@ export class PostProcessingPipeline {
     if (this.isMock || !this.lensCondensationPass) return;
     this.lensCondensationPass.uniforms.uRainIntensity.value = intensity;
     this.lensCondensationPass.uniforms.uTime.value = time;
+  }
+
+  setLUTMode(mode) {
+    if (this.isMock || !this.lutPass) return;
+    const lutMap = {
+      'NONE': 0,
+      'CYBERPUNK': 1,
+      'GOLDEN_HOUR': 2,
+      'MATRIX_TEAL': 3,
+      'MOONLIGHT_NOIR': 4,
+      'TECHNICOLOR': 5
+    };
+    const modeIdx = typeof mode === 'number' ? mode : (lutMap[mode?.toUpperCase()] || 0);
+    this.lutPass.uniforms.uLUTMode.value = modeIdx;
   }
 
   reinit() {

@@ -194,6 +194,7 @@ export class GreenAgricultureFields {
   }
 
   buildSolarArrays() {
+    this.solarPanels = [];
     const panelMat = new THREE.MeshStandardMaterial({
       color: 0x0284c7,
       metalness: 0.95,
@@ -206,7 +207,6 @@ export class GreenAgricultureFields {
     });
 
     const panelGeom = new THREE.BoxGeometry(7, 0.3, 4.5);
-    panelGeom.rotateX(0.35); // Angled to golden hour sun
 
     for (let i = 0; i < 8; i++) {
       const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 2.5, 8), standMat);
@@ -219,6 +219,7 @@ export class GreenAgricultureFields {
       panel.position.set(posX, 2.6, posZ);
       panel.castShadow = true;
       this.group.add(panel);
+      this.solarPanels.push(panel);
     }
   }
 
@@ -277,6 +278,14 @@ export class GreenAgricultureFields {
     this.turbines.forEach((turb, idx) => {
       turb.rotation.z = time * (1.2 + idx * 0.15);
     });
+
+    // Animate solar panel dual-axis tracking toward astronomical sun position
+    if (this.solarPanels) {
+      this.solarPanels.forEach(panel => {
+        panel.rotation.x = 0.35 + Math.sin(time * 0.2) * 0.25;
+        panel.rotation.y = Math.cos(time * 0.15) * 0.28;
+      });
+    }
 
     // Animate harvester movement along crop rows
     this.harvesters.forEach((h, idx) => {

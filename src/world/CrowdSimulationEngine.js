@@ -130,13 +130,18 @@ export class CrowdSimulationEngine {
         const walkCycle = Math.sin(time * 8.0 * a.speed + a.phaseOffset);
         a.legL.rotation.x = walkCycle * 0.45;
         a.legR.rotation.x = -walkCycle * 0.45;
-        a.mesh.position.y = 0.02 + Math.abs(Math.sin(time * 16.0 * a.speed)) * 0.012;
       } else {
         // Stand still at crosswalk
         a.legL.rotation.x = 0;
         a.legR.rotation.x = 0;
-        a.mesh.position.y = 0.02;
       }
+
+      // Planetary curvature elevation correction (R = 800m)
+      const curvatureDrop = -(a.x * a.x + a.z * a.z) / 1600.0;
+      const walkBob = shouldStop ? 0.0 : Math.abs(Math.sin(time * 16.0 * a.speed)) * 0.012;
+      a.mesh.position.y = 0.04 + curvatureDrop + walkBob;
+      a.mesh.position.x = a.x;
+      a.mesh.position.z = a.z;
 
       a.mesh.position.z = a.z;
     }
