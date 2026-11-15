@@ -364,6 +364,12 @@ class SkillverseApp {
     this.initAudioUnlock();
 
     window.addEventListener('resize', () => this.onResize());
+    document.addEventListener('visibilitychange', () => {
+      if (typeof document !== 'undefined' && !document.hidden && !this._isAnimating) {
+        this.clock.start();
+        this.animate();
+      }
+    });
     this.animate();
   }
 
@@ -1631,6 +1637,11 @@ class SkillverseApp {
   }
 
   animate() {
+    if (typeof document !== 'undefined' && document.hidden) {
+      this._isAnimating = false;
+      return;
+    }
+    this._isAnimating = true;
     requestAnimationFrame(() => this.animate());
 
     this.clock.update();
