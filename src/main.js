@@ -9,6 +9,54 @@ import { STL3DPrintExporter } from './exporters/STL3DPrintExporter.js';
 import { createHologramMaterial } from './shaders/hologramShader.js';
 import { SkillverseCoordinator } from './core/SkillverseCoordinator.js';
 
+/**
+ * Security & Input Validation Helpers
+ */
+export function escapeHTML(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function clampNumber(val, min, max, fallback = min) {
+  const num = parseFloat(val);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(min, Math.min(max, num));
+}
+
+/**
+ * Memory Safety: Clean WebGL Resource Disposal to prevent GPU VRAM buffer leaks
+ */
+export function disposeHierarchy(obj) {
+  if (!obj) return;
+  obj.traverse((child) => {
+    if (child.geometry) {
+      child.geometry.dispose();
+    }
+    if (child.material) {
+      if (Array.isArray(child.material)) {
+        child.material.forEach(m => disposeMaterial(m));
+      } else {
+        disposeMaterial(child.material);
+      }
+    }
+  });
+}
+
+export function disposeMaterial(mat) {
+  if (!mat) return;
+  Object.keys(mat).forEach(prop => {
+    if (mat[prop] && mat[prop].isTexture) {
+      mat[prop].dispose();
+    }
+  });
+  mat.dispose();
+}
+
 class SkillverseApp {
   constructor() {
     this.container = document.getElementById('webgl-container');
@@ -279,6 +327,20 @@ class SkillverseApp {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.xr.enabled = true; // WebXR Immersive VR Enable
+
+    // Fault Resilience: WebGL Context Loss & Restoration Handling
+    this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      console.warn('[Skillverse] WebGL Context Lost! Pausing render loop.');
+      this.showToast('⚠️ GPU CONTEXT LOST. PAUSING ENGINE UNTIL DRIVER RECOVERY.');
+    });
+
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      console.info('[Skillverse] WebGL Context Restored! Re-initializing viewport.');
+      this.showToast('✅ GPU CONTEXT RESTORED. RESUMING ENGINE.');
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
     this.container.appendChild(this.renderer.domElement);
   }
 
@@ -460,11 +522,11 @@ class SkillverseApp {
       playText.textContent = this.sequencer.isPlaying ? 'Pause Sequence' : 'Resume Sequence';
     });
 
-    // Timeline Scrubber Slider
+    // Timeline Scrubber Slider (Input validation: clamp bounds [0.0, 10.0] and reject NaN)
     this.timelineSlider = document.getElementById('timeline-slider');
     this.timecodeReadout = document.getElementById('timecode-readout');
     this.timelineSlider.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
+      const val = clampNumber(e.target.value, 0.0, 10.0, 0.0);
       this.sequencer.seek(val);
       this.updateTimelineUI(val);
     });
@@ -619,11 +681,11 @@ class SkillverseApp {
     document.getElementById('dial-dot').style.backgroundColor = s.color;
 
     const stream = document.getElementById('dialogue-stream');
-    stream.innerHTML = `
-      <div class="dialogue-msg msg-robot">
-        "Greetings, Explorer! I am the <strong>${s.name}</strong> (${s.scale}). I live and work in the ${s.zone}. Currently, my core focus is ${s.task}. What would you like to explore together?"
-      </div>
-    `;
+    stream.innerHTML = '';
+    const welcome = document.createElement('div');
+    welcome.className = 'dialogue-msg msg-robot';
+    welcome.innerHTML = `"Greetings, Explorer! I am the <strong>${escapeHTML(s.name)}</strong> (${escapeHTML(s.scale)}). I live and work in the ${escapeHTML(s.zone)}. Currently, my core focus is ${escapeHTML(s.task)}. What would you like to explore together?"`;
+    stream.appendChild(welcome);
 
     terminal.classList.add('open');
     this.audioEngine.playRobotChirp();
@@ -633,34 +695,39 @@ class SkillverseApp {
     const stream = document.getElementById('dialogue-stream');
     const s = this.selectedRobot ? this.selectedRobot.meta : { name: 'Skill Robot', id: 'coding' };
 
-    // Append explorer message
+    // Input sanitization: limit length to 300 chars to avoid memory/rendering spikes
+    const rawQuery = String(query || '').slice(0, 300).trim();
+    if (!rawQuery) return;
+
+    // Append explorer message safely as textContent to prevent DOM XSS
     const expMsg = document.createElement('div');
     expMsg.className = 'dialogue-msg msg-explorer';
-    expMsg.textContent = query;
+    expMsg.textContent = rawQuery;
     stream.appendChild(expMsg);
 
     // Generate intelligent humanoid response based on skill domain
     setTimeout(() => {
       let reply = `In Skillverse, my purpose as the ${s.name} is to push the boundaries of human knowledge and technological harmony.`;
 
-      if (query.includes('Holographic Widget') || query.includes('Run Code')) {
+      if (rawQuery.includes('Holographic Widget') || rawQuery.includes('Run Code')) {
         this.spawnCodingHolographicWidget();
         reply = `Quantum code compiled and executed in 1.4ms! Projecting live interactive 3D Holographic Torus Knot widget directly above my translucent keyboard.`;
-      } else if (query.includes('project') || query.includes('Active')) {
+      } else if (rawQuery.includes('project') || rawQuery.includes('Active')) {
         reply = `Right now, I am actively collaborating on "${s.task}". Our telemetry feeds directly into the planetary neural grid!`;
-      } else if (query.includes('collab') || query.includes('Collaborate')) {
+      } else if (rawQuery.includes('collab') || rawQuery.includes('Collaborate')) {
         reply = `Skills in Skillverse never work in isolation! For instance, the Coding Robot and AI Robot build smart city operating systems, while Engineering and Medicine robots repair advanced clinical surgical suites.`;
-      } else if (query.includes('tool') || query.includes('Rigs')) {
+      } else if (rawQuery.includes('tool') || rawQuery.includes('Rigs')) {
         reply = `My signature rig is the ${s.rig}, constructed from ${s.material}. It allows me to project sub-millimeter holographic interfaces at 25-35 cm scale!`;
-      } else if (query.includes('Future') || query.includes('evolve')) {
+      } else if (rawQuery.includes('Future') || rawQuery.includes('evolve')) {
         reply = `Skillverse grows as human skills grow. Every new discipline, creative movement, and scientific breakthrough manifests as a new companion humanoid robot here on miniature Earth!`;
       } else {
         reply = `Fascinating inquiry, Explorer! As the ${s.name}, I process that through ${s.material} computation. My advice: always balance precision with human-centric curiosity.`;
       }
 
+      // Safe injection using textContent to prevent injection vulnerabilities
       const botMsg = document.createElement('div');
       botMsg.className = 'dialogue-msg msg-robot';
-      botMsg.innerHTML = `"${reply}"`;
+      botMsg.textContent = `"${reply}"`;
       stream.appendChild(botMsg);
       stream.scrollTop = stream.scrollHeight;
 
@@ -669,8 +736,11 @@ class SkillverseApp {
   }
 
   spawnCodingHolographicWidget() {
+    // Memory Safety: Cleanly dispose old GPU VRAM buffers before allocating new mesh
     if (this.holographicWidget) {
       this.scene.remove(this.holographicWidget);
+      disposeHierarchy(this.holographicWidget);
+      this.holographicWidget = null;
     }
 
     const widgetGroup = new THREE.Group();
@@ -789,7 +859,6 @@ class SkillverseApp {
   }
 
   jumpToZone(zoneKey) {
-    this.setCameraMode('orbit');
     const targets = {
       'tech-city': { cam: [0, 60, -30], target: [0, 20, 20] },
       'ai-valley': { cam: [-240, 50, -120], target: [-240, 25, -160] },
@@ -805,12 +874,16 @@ class SkillverseApp {
       'university': { cam: [80, 35, -80], target: [80, 10, -120] }
     };
 
-    const t = targets[zoneKey];
-    if (t) {
-      this.camera.position.set(...t.cam);
-      this.controls.target.set(...t.target);
-      this.showToast(`TELEPORTED TO ZONE: ${zoneKey.toUpperCase().replace('-', ' ')}`);
+    if (!targets[zoneKey]) {
+      console.warn(`[Skillverse] Unknown zone navigation key rejected: "${escapeHTML(String(zoneKey))}"`);
+      return;
     }
+
+    this.setCameraMode('orbit');
+    const t = targets[zoneKey];
+    this.camera.position.set(...t.cam);
+    this.controls.target.set(...t.target);
+    this.showToast(`TELEPORTED TO ZONE: ${zoneKey.toUpperCase().replace('-', ' ')}`);
   }
 
   updateActiveBtn(btnList, activeBtn) {
@@ -910,7 +983,9 @@ class SkillverseApp {
   }
 }
 
-// Initialize Application when DOM is ready
-window.addEventListener('DOMContentLoaded', () => {
-  new SkillverseApp();
-});
+// Initialize Application when DOM is ready in browser environment
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', () => {
+    new SkillverseApp();
+  });
+}

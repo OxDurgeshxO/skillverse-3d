@@ -12,21 +12,26 @@ export class SpatialAudioEngine {
 
   init() {
     if (this.isInitialized) return;
+    if (typeof window === 'undefined') return;
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
 
-    this.ctx = new AudioContext();
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
-    this.masterGain.connect(this.ctx.destination);
+    try {
+      this.ctx = new AudioContext();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+      this.masterGain.connect(this.ctx.destination);
 
-    this.initWindGenerator();
-    this.initCityHum();
-    this.initSubRumble();
+      this.initWindGenerator();
+      this.initCityHum();
+      this.initSubRumble();
 
-    this.isInitialized = true;
-    this.isMuted = false;
-    this.masterGain.gain.setTargetAtTime(0.4, this.ctx.currentTime, 0.5);
+      this.isInitialized = true;
+      this.isMuted = false;
+      this.masterGain.gain.setTargetAtTime(0.4, this.ctx.currentTime, 0.5);
+    } catch (err) {
+      console.warn('SpatialAudioEngine initialization prevented:', err);
+    }
   }
 
   initWindGenerator() {
@@ -208,8 +213,11 @@ export class SpatialAudioEngine {
       this.init();
       return true;
     }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
     this.isMuted = !this.isMuted;
-    if (this.masterGain) {
+    if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(this.isMuted ? 0.0 : 0.4, this.ctx.currentTime, 0.1);
     }
     return !this.isMuted;

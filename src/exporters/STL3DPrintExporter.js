@@ -83,8 +83,25 @@ export class STL3DPrintExporter {
       }
     });
 
+    // Sanitize filename against path traversal and invalid characters
+    let cleanName = String(filename || 'skill_robot_miniature.stl')
+      .replace(/[\/\?<>\\:\*\|":]/g, '_')
+      .replace(/\.\.+/g, '_')
+      .trim();
+    if (!cleanName.toLowerCase().endsWith('.stl')) {
+      cleanName += '.stl';
+    }
+
+    // Safety ceiling: prevent unbounded string allocation / memory exhaustion
+    const MAX_TRIANGLES = 250000;
+    if (triangles.length > MAX_TRIANGLES) {
+      console.warn(`[STL3DPrintExporter] Triangle count exceeds safety limit (${triangles.length} > ${MAX_TRIANGLES}). Clamped.`);
+      triangles.length = MAX_TRIANGLES;
+    }
+
     // Generate ASCII STL file content
-    let stl = `solid ${filename.replace(/[^a-zA-Z0-9]/g, '_')}\n`;
+    const headerName = cleanName.replace(/[^a-zA-Z0-9]/g, '_');
+    let stl = `solid ${headerName}\n`;
     triangles.forEach((tri) => {
       stl += `  facet normal ${tri.normal.x.toExponential(6)} ${tri.normal.y.toExponential(6)} ${tri.normal.z.toExponential(6)}\n`;
       stl += `    outer loop\n`;
@@ -94,16 +111,18 @@ export class STL3DPrintExporter {
       stl += `    endloop\n`;
       stl += `  endfacet\n`;
     });
-    stl += `endsolid\n`;
+    stl += `endsolid ${headerName}\n`;
 
-    // Trigger browser download
-    const blob = new Blob([stl], { type: 'text/plain' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    // Trigger browser download safely
+    if (typeof document !== 'undefined' && typeof Blob !== 'undefined' && typeof URL !== 'undefined') {
+      const blob = new Blob([stl], { type: 'text/plain' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = cleanName;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
 
-    return { triangleCount: triangles.length, printHeightMm };
+    return { triangleCount: triangles.length, printHeightMm, filename: cleanName };
   }
 }
