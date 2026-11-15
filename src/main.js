@@ -5,14 +5,11 @@ import { RobotBuilder } from './entities/RobotBuilder.js';
 import { ExplorerAvatar } from './entities/ExplorerAvatar.js';
 import { CameraSequencer } from './cinematics/CameraSequencer.js';
 import { SpatialAudioEngine } from './audio/SpatialAudioEngine.js';
-import { STL3DPrintExporter } from './exporters/STL3DPrintExporter.js';
 import { createHologramMaterial } from './shaders/hologramShader.js';
 import { SkillverseCoordinator } from './core/SkillverseCoordinator.js';
 import { PostProcessingPipeline } from './shaders/PostProcessingPipeline.js';
 import { HolographicRadar } from './ui/HolographicRadar.js';
 import { PictureInPictureCamera } from './cinematics/PictureInPictureCamera.js';
-import { VideoRecorderExporter } from './exporters/VideoRecorderExporter.js';
-import { RobotCustomizerModal } from './ui/RobotCustomizerModal.js';
 import { CrowdSimulationEngine } from './world/CrowdSimulationEngine.js';
 import { GpuParticleSystem } from './shaders/GpuParticleSystem.js';
 import { PhysicsWorld } from './physics/PhysicsWorld.js';
@@ -66,10 +63,34 @@ export function disposeMaterial(mat) {
   mat.dispose();
 }
 
+/**
+ * High-Precision Monotonic Performance Timer
+ * Replaces deprecated THREE.Clock with drift-free monotonic timestamps across browser & Node environments.
+ */
+export class PerformanceTimer {
+  constructor() {
+    this.previousTime = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+    this.currentTime = this.previousTime;
+    this.startTime = this.previousTime;
+    this.delta = 0.016;
+  }
+  update() {
+    this.currentTime = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+    this.delta = Math.max(0.0001, Math.min(this.currentTime - this.previousTime, 0.1));
+    this.previousTime = this.currentTime;
+  }
+  getDelta() {
+    return this.delta;
+  }
+  getElapsedTime() {
+    return this.currentTime - this.startTime;
+  }
+}
+
 class SkillverseApp {
   constructor() {
     this.container = document.getElementById('webgl-container');
-    this.clock = new THREE.Clock();
+    this.clock = new PerformanceTimer();
     this.cameraMode = 'cinematic'; // 'cinematic' | 'orbit' | 'explorer'
 
     this.coordinator = new SkillverseCoordinator(this);
@@ -324,6 +345,8 @@ class SkillverseApp {
     this.initAudio();
     this.initUI();
     this.initStageEnhancements();
+    this.initKeyboardShortcuts();
+    this.initAudioUnlock();
 
     window.addEventListener('resize', () => this.onResize());
     this.animate();
@@ -350,10 +373,55 @@ class SkillverseApp {
       console.info('[Skillverse] WebGL Context Restored! Re-initializing viewport.');
       this.showToast('✅ GPU CONTEXT RESTORED. RESUMING ENGINE.');
       this.renderer.setSize(window.innerWidth, window.innerHeight);
-      if (this.postProcessing) this.postProcessing.setSize(window.innerWidth, window.innerHeight);
+      if (this.postProcessing) {
+        this.postProcessing.reinit();
+      }
     });
 
     this.container.appendChild(this.renderer.domElement);
+    this.initWebXRControllers();
+  }
+
+  initWebXRControllers() {
+    if (!this.renderer?.xr) return;
+
+    try {
+      this.xrRaycaster = new THREE.Raycaster();
+      const markerGeom = new THREE.RingGeometry(0.3, 0.35, 32);
+      markerGeom.rotateX(-Math.PI / 2);
+      const markerMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide });
+      this.xrTeleportMarker = new THREE.Mesh(markerGeom, markerMat);
+      this.xrTeleportMarker.visible = false;
+      this.scene.add(this.xrTeleportMarker);
+
+      this.xrController = this.renderer.xr.getController(0);
+      if (this.xrController) {
+        this.xrController.addEventListener('selectstart', () => {
+          this.xrIsTeleporting = true;
+        });
+
+        this.xrController.addEventListener('selectend', () => {
+          this.xrIsTeleporting = false;
+          if (this.xrTeleportMarker.visible) {
+            const target = this.xrTeleportMarker.position;
+            this.camera.position.set(target.x, target.y + 1.68, target.z);
+            this.xrTeleportMarker.visible = false;
+            this.showToast('WEBXR 6-DOF TELEPORT COMPLETE');
+          }
+        });
+
+        const beamGeom = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -6)
+        ]);
+        const beamMat = new THREE.LineBasicMaterial({ color: 0x38bdf8 });
+        this.xrControllerRay = new THREE.Line(beamGeom, beamMat);
+        this.xrController.add(this.xrControllerRay);
+        this.scene.add(this.xrController);
+      }
+    } catch (e) {
+      // Non-fatal WebXR guard in headless mode
+    }
   }
 
   initPostProcessing() {
@@ -612,8 +680,9 @@ class SkillverseApp {
 
     // 3D Print STL Exporter Button
     const btnExportSTL = document.getElementById('btn-export-stl');
-    btnExportSTL.addEventListener('click', () => {
+    btnExportSTL.addEventListener('click', async () => {
       if (!this.selectedRobot) return;
+      const { STL3DPrintExporter } = await import('./exporters/STL3DPrintExporter.js');
       const res = STL3DPrintExporter.exportToSTL(
         this.selectedRobot.mesh,
         `${this.selectedRobot.id}_tabletop_28mm.stl`,
@@ -706,9 +775,10 @@ class SkillverseApp {
     // 4K Photo Studio Snapshot Capture
     const btnSnapshot = document.getElementById('btn-take-snapshot');
     if (btnSnapshot) {
-      btnSnapshot.addEventListener('click', () => {
-        if (this.videoExporter) {
-          const url = this.videoExporter.captureSnapshot(`skillverse-4k-frame-${Date.now()}.png`);
+      btnSnapshot.addEventListener('click', async () => {
+        const exporter = await this.getVideoExporter();
+        if (exporter) {
+          const url = exporter.captureSnapshot(`skillverse-4k-frame-${Date.now()}.png`);
           if (url) this.showToast('CAPTURED HIGH-RES 4K VIEWPORT SNAPSHOT (.PNG)');
         }
       });
@@ -717,11 +787,12 @@ class SkillverseApp {
     // 10s Video Clip Recording
     const btnRecordClip = document.getElementById('btn-record-clip');
     if (btnRecordClip) {
-      btnRecordClip.addEventListener('click', () => {
-        if (!this.videoExporter) return;
-        if (!this.videoExporter.isRecording) {
+      btnRecordClip.addEventListener('click', async () => {
+        const exporter = await this.getVideoExporter();
+        if (!exporter) return;
+        if (!exporter.isRecording) {
           try {
-            this.videoExporter.startRecording({ fps: 60 });
+            exporter.startRecording({ fps: 60 });
             btnRecordClip.textContent = '⏹ Stop (Rec)';
             btnRecordClip.style.color = '#ef4444';
             btnRecordClip.style.borderColor = '#ef4444';
@@ -730,7 +801,7 @@ class SkillverseApp {
             this.showToast('RECORDING NOT SUPPORTED: ' + e.message);
           }
         } else {
-          this.videoExporter.stopRecording();
+          exporter.stopRecording();
           btnRecordClip.textContent = '🎥 Record 10s';
           btnRecordClip.style.color = '';
           btnRecordClip.style.borderColor = '';
@@ -754,9 +825,10 @@ class SkillverseApp {
     // 3D Robot Builder Customizer Modal
     const btnOpenCustomizer = document.getElementById('btn-open-customizer');
     if (btnOpenCustomizer) {
-      btnOpenCustomizer.addEventListener('click', () => {
-        if (this.customizerModal) {
-          this.customizerModal.open();
+      btnOpenCustomizer.addEventListener('click', async () => {
+        const modal = await this.getCustomizerModal();
+        if (modal) {
+          modal.open();
         }
       });
     }
@@ -770,6 +842,63 @@ class SkillverseApp {
         }
       });
     }
+  }
+
+  initKeyboardShortcuts() {
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('keydown', (e) => {
+      // Ignore if user is typing in input or select
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+        return;
+      }
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        document.getElementById('btn-play')?.click();
+      } else if (e.key === 'c' || e.key === 'C') {
+        const btnCinematic = document.getElementById('mode-cinematic');
+        const btnOrbit = document.getElementById('mode-orbit');
+        const btnExplorer = document.getElementById('mode-explorer');
+        this.setCameraMode('cinematic');
+        if (btnCinematic && btnOrbit && btnExplorer) this.updateActiveBtn([btnCinematic, btnOrbit, btnExplorer], btnCinematic);
+      } else if (e.key === 'o' || e.key === 'O') {
+        const btnCinematic = document.getElementById('mode-cinematic');
+        const btnOrbit = document.getElementById('mode-orbit');
+        const btnExplorer = document.getElementById('mode-explorer');
+        this.setCameraMode('orbit');
+        if (btnCinematic && btnOrbit && btnExplorer) this.updateActiveBtn([btnCinematic, btnOrbit, btnExplorer], btnOrbit);
+      } else if (e.key === 'e' || e.key === 'E') {
+        const btnCinematic = document.getElementById('mode-cinematic');
+        const btnOrbit = document.getElementById('mode-orbit');
+        const btnExplorer = document.getElementById('mode-explorer');
+        this.setCameraMode('explorer');
+        if (btnCinematic && btnOrbit && btnExplorer) this.updateActiveBtn([btnCinematic, btnOrbit, btnExplorer], btnExplorer);
+      } else if (e.key === 'm' || e.key === 'M') {
+        document.getElementById('btn-world-menu')?.click();
+      } else if (e.key === 'f' || e.key === 'F') {
+        document.getElementById('btn-festival')?.click();
+      } else if (e.key === 'Escape') {
+        document.getElementById('dialogue-terminal')?.classList.remove('open');
+        document.getElementById('inspector-card')?.classList.remove('visible');
+        document.getElementById('world-controls-dropdown')?.classList.remove('open');
+        if (this.customizerModal) this.customizerModal.close();
+      }
+    });
+  }
+
+  initAudioUnlock() {
+    if (typeof window === 'undefined') return;
+
+    const unlock = () => {
+      if (this.audioEngine?.ctx && this.audioEngine.ctx.state === 'suspended') {
+        this.audioEngine.ctx.resume().catch(() => {});
+      }
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('keydown', unlock, { passive: true });
   }
 
   openDialogue(entry) {
@@ -1010,13 +1139,13 @@ class SkillverseApp {
 
   initStageEnhancements() {
     try {
-      // Stage 3: Holographic GPS Globe Radar HUD & PiP Multi-Cam & Video Studio
+      // Stage 3: Holographic GPS Globe Radar HUD & PiP Multi-Cam Viewport
       this.radar = new HolographicRadar({ planetRadius: 400 });
       this.pipCam = new PictureInPictureCamera({ width: 280, height: 158 });
-      this.videoExporter = new VideoRecorderExporter(this.renderer?.domElement);
+      this.videoExporter = null; // Lazy loaded via dynamic import on click
 
       // Stage 4: Inhabitant Intelligence, 3D Robot Customizer & Crowd Pathfinding
-      this.customizerModal = new RobotCustomizerModal(this);
+      this.customizerModal = null; // Lazy loaded via dynamic import on click
       this.crowdEngine = new CrowdSimulationEngine(this.scene, { count: 32 });
 
       // Stage 5: 50,000 GPU Particles, Water Buoyancy Physics, Voice Agent Bridge
@@ -1035,6 +1164,22 @@ class SkillverseApp {
     }
   }
 
+  async getVideoExporter() {
+    if (!this.videoExporter) {
+      const { VideoRecorderExporter } = await import('./exporters/VideoRecorderExporter.js');
+      this.videoExporter = new VideoRecorderExporter(this.renderer?.domElement);
+    }
+    return this.videoExporter;
+  }
+
+  async getCustomizerModal() {
+    if (!this.customizerModal) {
+      const { RobotCustomizerModal } = await import('./ui/RobotCustomizerModal.js');
+      this.customizerModal = new RobotCustomizerModal(this);
+    }
+    return this.customizerModal;
+  }
+
   onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
@@ -1045,8 +1190,16 @@ class SkillverseApp {
   animate() {
     requestAnimationFrame(() => this.animate());
 
-    const delta = Math.min(this.clock.getDelta(), 0.1);
+    this.clock.update();
+    const delta = this.clock.getDelta();
     const time = this.clock.getElapsedTime();
+
+    // Modulate lens condensation and rain droplet refraction during stratosphere cloud descent
+    if (this.postProcessing) {
+      const isCloudDescent = (this.camera.position.y > 220 && (this.cameraMode === 'cinematic' ? this.sequencer.currentTime < 4.5 : true));
+      const rainIntensity = isCloudDescent ? Math.min(1.0, Math.max(0.0, (this.camera.position.y - 220) / 180)) : 0.0;
+      this.postProcessing.setRainIntensity(rainIntensity, time);
+    }
 
     // 1. Update Camera Sequencer
     if (this.cameraMode === 'cinematic') {
@@ -1124,6 +1277,24 @@ class SkillverseApp {
     // 6. FPS Telemetry
     const fps = Math.round(1 / Math.max(delta, 0.001));
     document.getElementById('hud-fps').textContent = `${fps} FPS`;
+
+    // 6b. WebXR 6-DoF Controller Raycast Teleportation
+    if (this.renderer?.xr?.isPresenting && this.xrIsTeleporting && this.xrController && this.xrTeleportMarker) {
+      const tempMatrix = new THREE.Matrix4();
+      tempMatrix.identity().extractRotation(this.xrController.matrixWorld);
+      this.xrRaycaster.ray.origin.setFromMatrixPosition(this.xrController.matrixWorld);
+      this.xrRaycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+      const terrainMesh = this.worldManager?.terrain?.mesh;
+      const intersects = terrainMesh ? this.xrRaycaster.intersectObject(terrainMesh) : [];
+      if (intersects.length > 0) {
+        this.xrTeleportMarker.position.copy(intersects[0].point);
+        this.xrTeleportMarker.position.y += 0.05;
+        this.xrTeleportMarker.visible = true;
+      } else {
+        this.xrTeleportMarker.visible = false;
+      }
+    }
 
     // 7. Render Post-Processing Pipeline (Unreal Bloom & Miniature Tilt-Shift)
     if (this.postProcessing) {
