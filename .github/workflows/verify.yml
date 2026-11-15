@@ -1,4 +1,7 @@
 name: Verify & Test
+permissions:
+  contents: read
+
 
 on:
   push:
